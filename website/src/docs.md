@@ -346,7 +346,7 @@ Press **Change** next to their name to tick different boxes, or **Remove** to ta
 
 ## What invited people cannot do
 
-They cannot delete the server, invite others, create servers, add machines or change the panel's own settings. Those stay with the owner and the admin.
+They cannot delete the server, invite others, add machines or change the panel's own settings. Those stay with the owner and the admin. Creating servers is separate: see [Accounts and their servers](/docs/accounts).
 
 ## Stop new sign-ups
 
@@ -486,6 +486,60 @@ Type that address into your phone's browser and sign in.
 - The icon opens the address you added. If you added the home-network address, it only works on your home Wi-Fi.
 - If your home's public address changes, remove the icon and add it again with the new address.
 - Everything the panel does on a computer works on the phone, including the console and file editor.
+
+=== accounts | Running Consolry | Accounts and their servers | See who has an account, and let people create servers of their own.
+
+The **Accounts** page, in the left menu, lists everyone with an account on your panel. Only the admin sees it.
+
+## Let someone create their own servers
+
+A new account cannot create servers. To allow it:
+
+1. Open **Accounts** and find the person.
+2. Set **Servers they may create** to a number above 0.
+3. Choose the most memory each of their servers may use.
+4. Press **Save**. They may need to reload the panel to see **New server**.
+
+They own the servers they create: they can do everything on them, including sharing them from the [Users tab](/docs/users) and deleting them. You, as admin, can still open and manage every server.
+
+## What they can and cannot do
+
+- They can create Minecraft servers only, up to their number, on the first machine.
+- They cannot go above their memory allowance, when creating a server or later.
+- They cannot create custom-command servers, change a start command, add machines or change panel settings.
+
+> Servers run on your computer and use its memory and disk. A server's plugins can run any program there. Only let people you trust create servers.
+
+## New accounts
+
+At the bottom of the page, **New accounts** sets what an account gets when it signs up. Leave servers at 0 to decide for each person yourself.
+
+## Remove an account
+
+Press **Remove** next to the account. The person is signed out and can no longer sign in. Servers they owned are kept and pass to you.
+
+=== updating | Running Consolry | Updating | Install a new version from inside the panel.
+
+From version 0.3.0, Consolry updates itself. You do not need to download the program again.
+
+## How to update
+
+When a newer version is out, the admin sees a notice at the top of the panel. Press **Update now**, then **Update and restart**.
+
+Consolry then:
+
+1. Downloads the new version and checks it against its published fingerprint.
+2. Saves and stops your running servers.
+3. Swaps the program and starts again.
+4. Starts the servers that were running.
+
+This takes about a minute, and players are disconnected while it happens. The page reloads by itself when Consolry is back. Your servers, worlds, backups and accounts are not touched.
+
+## Good to know
+
+- Consolry looks for a new version about once an hour. It never updates without you pressing the button.
+- Updating from 0.1.0 or 0.2.0 has to be done by hand one last time: download the newest version from the [download page](https://www.consolry.com/download) and replace the old file, or run the install command again on Linux.
+- If the new version does not come back, start Consolry again yourself. The previous program is kept next to the new one as a file ending in `.old` until the new one has started.
 
 === second-machine | Running Consolry | A second machine | Run servers on another computer from the same panel.
 
