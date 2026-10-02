@@ -310,6 +310,48 @@ The command typed into the console to shut the server down cleanly. For Minecraf
 
 The page says which Java the server needs and which one will run it. If your computer's own Java is new enough, that is used. Otherwise Consolry uses a copy it downloaded for itself, kept in its data folder. It never changes the Java installed on your computer.
 
+=== users | Managing a server | Users and permissions | Share a server with other people and choose what each one can do.
+
+The **Users** tab lets other people help run a server without giving them your password. Only the server's owner and the panel's admin see this tab.
+
+## Invite someone
+
+1. Ask them to open your panel and choose **Create an account** on the sign-in page. They need to be able to reach the panel, so see [Remote access](/docs/remote-access) first.
+2. Ask for the username they picked.
+3. Open the server, go to **Users**, type their username and tick what they may do.
+4. Press **Invite**. The server appears in their panel straight away.
+
+## What each permission allows
+
+| Permission | Lets them |
+| --- | --- |
+| Console | Read the console and type commands |
+| Start and stop | Start, stop and kill the server |
+| Files | Open, change, upload and delete the server's files |
+| Plugins and mods | Install and update them |
+| Players | Kick, ban, whitelist and make operators |
+| Settings | Change game settings, the version, memory and start-up options |
+| Backups | Make, download, restore and delete backups |
+| Schedules | Add, change and run scheduled tasks |
+| Network | See the address and open or close the port |
+| Activity | See who did what on the server |
+
+Everyone you invite can see the server's dashboard. With nothing ticked, that is all they can do.
+
+> **Console** is a powerful permission: someone who can type commands can make themselves an operator. **Files** is too, because it includes the server's settings files. Give both only to people you trust.
+
+## Change or remove someone
+
+Press **Change** next to their name to tick different boxes, or **Remove** to take the server away from them. Both take effect at once.
+
+## What invited people cannot do
+
+They cannot delete the server, invite others, create servers, add machines or change the panel's own settings. Those stay with the owner and the admin.
+
+## Stop new sign-ups
+
+Once everyone has an account, the admin can untick **Let people create their own account** on the **Remote access** page. A new account can do nothing until a server is shared with it.
+
 === background | Running Consolry | Running in the background | Keep your servers up after you close the window or restart.
 
 Your servers only run while Consolry runs.
@@ -371,6 +413,79 @@ Quit Consolry, replace the program file with the newer one, and start it again. 
 ## Removing it
 
 Quit Consolry and untick **Start when I sign in**, or run `consolry -autostart off` on Linux. Then delete the program file and the data folder. Deleting the data folder deletes your worlds and backups.
+
+=== remote-access | Running Consolry | Remote access | Open the panel from your phone, another computer, or outside your home.
+
+A new install only answers on the computer it runs on, at `http://127.0.0.1:8700`. The **Remote access** page, in the left menu, changes that. Only the admin sees it.
+
+## The three choices
+
+| Choice | Who can open the panel |
+| --- | --- |
+| Only this computer | A browser on the same machine. This is the default. |
+| My home network | Phones and computers on the same Wi-Fi or network. |
+| Anywhere | Any device on the internet. Consolry asks your router to open the panel's port. |
+
+After you choose, the page shows the address to use from other devices, such as `http://192.168.1.20:8700` at home or `http://203.0.113.5:8700` from anywhere.
+
+## The Windows firewall question
+
+The first time you choose something other than "Only this computer", Windows asks whether to allow Consolry through the firewall. Choose **Allow**. If you closed the question, or other devices cannot connect:
+
+1. Open **Windows Security**, then **Firewall & network protection**.
+2. Choose **Allow an app through firewall**.
+3. Find **Consolry** and tick **Private**.
+
+## Before you choose "Anywhere"
+
+> The connection is not encrypted, and anyone who finds the address can reach your sign-in page. Consolry is also a pre-release. Open it to the internet only if you need to.
+
+- Use a long password that you use nowhere else.
+- Eight wrong passwords from one address lock that address out for 15 minutes.
+- Switch back to "My home network" when you do not need it.
+
+## If "Anywhere" does not work
+
+The page says why in a sentence. The common reasons are the same as for a game server's port, and so are the fixes: see [Network and ports](/docs/network).
+
+- **Your router did not answer:** switch on UPnP in the router's settings.
+- **Your provider shares one public address:** the port opens on your router, but nothing outside your home can reach it. Ask your provider for a public address.
+
+Your home's public address can change when the router restarts. If the address stops working, open the Remote access page at home to see the new one.
+
+## On Linux
+
+It works the same way. If the machine has its own firewall, allow the port, for example `sudo ufw allow 8700/tcp`.
+
+=== phone | Running Consolry | On your phone | Put Consolry on your Android phone or iPhone's home screen.
+
+Consolry does not have an app in the App Store or Google Play. Instead, the panel itself can be added to your phone's home screen. It gets its own icon and opens full screen, without the browser's address bar.
+
+## 1. Let your phone reach the panel
+
+On the computer running Consolry, open **Remote access** and choose **My home network**, or **Anywhere** to use it away from home. The page shows the address to use. See [Remote access](/docs/remote-access).
+
+## 2. Open it and sign in
+
+Type that address into your phone's browser and sign in.
+
+## 3. Add it to your home screen
+
+**iPhone or iPad**, in Safari:
+
+1. Tap the Share button.
+2. Tap **Add to Home Screen**, then **Add**.
+
+**Android**, in Chrome:
+
+1. Tap the three-dot menu.
+2. Tap **Add to Home screen**, then **Add**.
+
+## Things to know
+
+- The icon opens the address you added. If you added the home-network address, it only works on your home Wi-Fi.
+- If your home's public address changes, remove the icon and add it again with the new address.
+- Everything the panel does on a computer works on the phone, including the console and file editor.
 
 === second-machine | Running Consolry | A second machine | Run servers on another computer from the same panel.
 

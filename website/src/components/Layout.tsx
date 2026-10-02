@@ -52,7 +52,7 @@ export default function Layout({ path, children }: { path: string; children: Rea
           <div>
             <p className="label">Waitlist</p>
             <h2 id="waitlist-title">Get one email when it's ready.</h2>
-            <p>Leave your address and we'll write once, when the first release is out.</p>
+            <p>Leave your address for occasional updates on Consolry's progress, and word when the first full release is out.</p>
           </div>
           <Waitlist />
         </div>

@@ -119,7 +119,7 @@ export function DownloadPage() {
         <div className="wrap">
           <p className="warning">
             <strong>This is a pre-release, not a finished product.</strong> Things may break or change between versions. Keep your own copy of any world you
-            care about, and do not open the panel itself to the internet.
+            care about, and only open the panel to the internet if you need to.
           </p>
         </div>
       </section>
@@ -172,11 +172,24 @@ export function DownloadPage() {
           </div>
           <div>
             <dt>Friends joining</dt>
-            <dd>To let people outside your home join, forward the server's port (usually 25565) on your router. Consolry does not do this for you yet.</dd>
+            <dd>To let people outside your home join, press "Open the port for me" on the server's Network tab. Consolry asks your router to forward it.</dd>
           </div>
           <div>
-            <dt>Keep the panel private</dt>
-            <dd>The panel only answers on your own machine. Do not open it to the internet in this pre-release.</dd>
+            <dt>The panel starts private</dt>
+            <dd>
+              It only answers on your own machine until you choose otherwise. The Remote access page can open it to your home network or to the internet.
+            </dd>
+          </div>
+          <div>
+            <dt>On your phone</dt>
+            <dd>
+              There is no app store download. Open the panel in your phone's browser and add it to your home screen: it gets its own icon and opens full
+              screen. <a href="/docs/phone">How to set it up</a>
+            </dd>
+          </div>
+          <div>
+            <dt>Sharing a server</dt>
+            <dd>Friends make their own account, and you choose what each one can do from the server's Users tab.</dd>
           </div>
         </dl>
         <p className="more">
