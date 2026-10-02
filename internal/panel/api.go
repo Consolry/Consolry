@@ -291,6 +291,7 @@ type serverView struct {
 	Command     string   `json:"command"`
 	Args        []string `json:"args"`
 	StopCommand string   `json:"stopCommand"`
+	StartedAt   int64    `json:"startedAt"`
 }
 
 func (a *App) handleServers(w http.ResponseWriter, r *http.Request) {
@@ -322,7 +323,7 @@ func (a *App) handleServers(w http.ResponseWriter, r *http.Request) {
 	for i, row := range rows {
 		view := serverView{ID: row.ID, Name: row.Name, NodeID: row.NodeID, NodeName: names[row.NodeID], State: "unreachable", Args: []string{}}
 		if spec, ok := live[strconv.FormatInt(row.NodeID, 10)+"/"+row.ID]; ok {
-			view.State, view.Command, view.StopCommand = spec.State, spec.Command, spec.StopCommand
+			view.State, view.Command, view.StopCommand, view.StartedAt = spec.State, spec.Command, spec.StopCommand, spec.StartedAt
 			if spec.Args != nil {
 				view.Args = spec.Args
 			}

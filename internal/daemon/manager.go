@@ -17,7 +17,8 @@ var ErrNotFound = errors.New("server not found")
 // Info is a server's spec plus its current state.
 type Info struct {
 	Spec
-	State State `json:"state"`
+	State     State `json:"state"`
+	StartedAt int64 `json:"startedAt"`
 }
 
 // Manager owns every server on this machine and remembers them across restarts.
@@ -105,7 +106,7 @@ func (m *Manager) List() []Info {
 	defer m.mu.Unlock()
 	list := make([]Info, 0, len(m.servers))
 	for _, s := range m.servers {
-		list = append(list, Info{Spec: s.spec, State: s.State()})
+		list = append(list, Info{Spec: s.spec, State: s.State(), StartedAt: s.StartedAt()})
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
 	return list

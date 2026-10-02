@@ -21,6 +21,7 @@ type daemonSpec struct {
 	Args        []string `json:"args"`
 	StopCommand string   `json:"stopCommand"`
 	State       string   `json:"state,omitempty"`
+	StartedAt   int64    `json:"startedAt,omitempty"`
 }
 
 // call makes one request to a node's daemon and decodes the JSON reply into out.

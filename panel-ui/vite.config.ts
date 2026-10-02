@@ -10,7 +10,13 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": { target: "http://127.0.0.1:8700", ws: true },
+      // CONSOLRY_DEV_PANEL and CONSOLRY_DEV_COOKIE let a dev server point at another panel
+      // with a ready-made session, which is how the interface is screenshotted.
+      "/api": {
+        target: process.env.CONSOLRY_DEV_PANEL ?? "http://127.0.0.1:8700",
+        ws: true,
+        headers: process.env.CONSOLRY_DEV_COOKIE ? { Cookie: process.env.CONSOLRY_DEV_COOKIE } : undefined,
+      },
     },
   },
 });

@@ -40,12 +40,13 @@ type Server struct {
 	spec Spec
 	dir  string
 
-	mu    sync.Mutex
-	state State
-	cmd   *exec.Cmd
-	stdin io.WriteCloser
-	lines []string
-	subs  map[chan string]struct{}
+	mu        sync.Mutex
+	state     State
+	startedAt time.Time
+	cmd       *exec.Cmd
+	stdin     io.WriteCloser
+	lines     []string
+	subs      map[chan string]struct{}
 }
 
 func newServer(spec Spec, dir string) *Server {
@@ -56,6 +57,16 @@ func (s *Server) State() State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.state
+}
+
+// StartedAt is when the running process was launched, as Unix seconds, or 0 if it isn't running.
+func (s *Server) StartedAt() int64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.startedAt.IsZero() {
+		return 0
+	}
+	return s.startedAt.Unix()
 }
 
 func (s *Server) Start() error {
@@ -91,7 +102,7 @@ func (s *Server) Start() error {
 	}
 	w.Close()
 
-	s.cmd, s.stdin, s.state = cmd, stdin, StateRunning
+	s.cmd, s.stdin, s.state, s.startedAt = cmd, stdin, StateRunning, time.Now()
 	s.appendLocked("[consolry] Server started")
 	go s.watch(cmd, r)
 	return nil
@@ -128,7 +139,7 @@ func (s *Server) watch(cmd *exec.Cmd, r *os.File) {
 	} else {
 		s.state = StateOffline
 	}
-	s.cmd, s.stdin = nil, nil
+	s.cmd, s.stdin, s.startedAt = nil, nil, time.Time{}
 	s.appendLocked(fmt.Sprintf("[consolry] Server stopped (exit code %d)", code))
 }
 

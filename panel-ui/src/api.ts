@@ -2,6 +2,7 @@ export type User = { id: number; username: string };
 export type PanelState = { setupNeeded: boolean; version: string; user: User | null };
 export type NodeInfo = { id: number; name: string; url: string; online: boolean; os?: string; version?: string };
 export type ServerState = "offline" | "running" | "stopping" | "crashed" | "unreachable";
+export type PowerAction = "start" | "stop" | "kill";
 export type ServerInfo = {
   id: string;
   name: string;
@@ -11,6 +12,8 @@ export type ServerInfo = {
   command: string;
   args: string[];
   stopCommand: string;
+  /** Unix seconds when the running process started, or 0. */
+  startedAt: number;
 };
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -39,10 +42,33 @@ export const api = {
   createServer: (input: { name: string; nodeId: number; startCommand: string; stopCommand: string }) =>
     request<{ id: string }>("POST", "/servers", input),
   deleteServer: (id: string) => request<void>("DELETE", `/servers/${id}`),
-  power: (id: string, action: "start" | "stop" | "kill") => request<{ state: string }>("POST", `/servers/${id}/power`, { action }),
+  power: (id: string, action: PowerAction) => request<{ state: string }>("POST", `/servers/${id}/power`, { action }),
 };
 
 export function consoleSocket(serverId: string) {
   const scheme = location.protocol === "https:" ? "wss" : "ws";
   return new WebSocket(`${scheme}://${location.host}/api/servers/${serverId}/console`);
+}
+
+const stateLabels: Record<ServerState, string> = {
+  running: "Running",
+  offline: "Offline",
+  stopping: "Stopping",
+  crashed: "Crashed",
+  unreachable: "Node offline",
+};
+
+export const stateLabel = (state: ServerState) => stateLabels[state];
+
+/** How long a server has been up, such as "3 h 12 min". */
+export function uptime(startedAt: number, now: number) {
+  if (!startedAt) return "–";
+  const seconds = Math.max(0, Math.floor(now / 1000) - startedAt);
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (days) return `${days} d ${hours} h`;
+  if (hours) return `${hours} h ${minutes} min`;
+  if (minutes) return `${minutes} min ${seconds % 60} s`;
+  return `${seconds} s`;
 }
