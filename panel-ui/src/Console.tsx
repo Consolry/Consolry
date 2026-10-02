@@ -120,10 +120,12 @@ export default function Console({ serverId, running }: { serverId: string; runni
   const rendered = useMemo(() => {
     const health = pluginHealth(lines);
     let level: ReturnType<typeof colourLine>["level"] = "";
+    let list = false;
     const out: { text: string; node: ReactNode }[] = [];
     for (const text of lines) {
-      const result = colourLine(text, health, level);
+      const result = colourLine(text, health, level, list);
       level = result.level;
+      list = result.list;
       out.push({ text, node: result.node });
     }
     return out;

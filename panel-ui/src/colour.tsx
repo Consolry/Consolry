@@ -57,18 +57,50 @@ export function pluginHealth(lines: string[]): Map<string, PluginHealth> {
   return health;
 }
 
-/** One log line as coloured pieces. `inherited` is the level of the line above, for stack traces. */
-export function colourLine(line: string, health: Map<string, PluginHealth>, inherited: Level): { node: ReactNode; level: Level } {
-  if (line.startsWith("[consolry]")) return { node: <span className="c-system">{line}</span>, level: "" };
+const listHeader = /Plugins \(\d+\):\s*$/;
+
+/**
+ * A line from a plugin list, such as " - AxAuctions, AxKoth (2.21.0), Essentials", with each
+ * name coloured by that plugin's state. Names the log has said nothing about stay plain.
+ */
+function pluginList(text: string, health: Map<string, PluginHealth>): ReactNode[] {
+  return text.split(/(, )/).map((part, index) => {
+    if (part === ", ") return part;
+    const lead = /^\s*(?:- )?/.exec(part)![0];
+    const rest = part.slice(lead.length);
+    const name = rest.split(" (")[0].trim();
+    const state = health.get(name.toLowerCase());
+    return (
+      <span key={index}>
+        {lead}
+        <span className={`c-tag ${state ?? "unknown"}`} title={state ? tagTitle[state] : undefined}>
+          {name}
+        </span>
+        {rest.slice(name.length)}
+      </span>
+    );
+  });
+}
+
+type Coloured = { node: ReactNode; level: Level; list: boolean };
+
+/**
+ * One log line as coloured pieces. `inherited` is the level of the line above, for stack traces;
+ * `inList` says the line above was part of a plugin list, which can run over several lines.
+ */
+export function colourLine(line: string, health: Map<string, PluginHealth>, inherited: Level, inList = false): Coloured {
+  if (line.startsWith("[consolry]")) return { node: <span className="c-system">{line}</span>, level: "", list: false };
 
   const head = prefix.exec(line);
   if (!head) {
+    // The list Paper prints while starting has no timestamps: " - Name (1.2.3), Other (4.5)".
+    if (/^\s+- \S/.test(line) && /\(\S+\)/.test(line)) return { node: pluginList(line, health), level: "", list: true };
     // No timestamp: a stack trace or a continuation of the line above.
     if (/^\s+at |^Caused by:|^\s*\.\.\. \d+ more|Exception|^java\.|^org\.|^com\./.test(line) || inherited === "error") {
-      return { node: <span className="c-trace">{line}</span>, level: "error" };
+      return { node: <span className="c-trace">{line}</span>, level: "error", list: false };
     }
-    if (line.startsWith("WARNING:") || inherited === "warn") return { node: <span className="c-warn">{line}</span>, level: "warn" };
-    return { node: <span className="c-plain">{line}</span>, level: "" };
+    if (line.startsWith("WARNING:") || inherited === "warn") return { node: <span className="c-warn">{line}</span>, level: "warn", list: false };
+    return { node: <span className="c-plain">{line}</span>, level: "", list: false };
   }
 
   const level = levelOf(head[2]);
@@ -83,6 +115,22 @@ export function colourLine(line: string, health: Map<string, PluginHealth>, inhe
     </span>,
     " ",
   ];
+
+  // The answer to /plugins: a heading, then names on lines that start with a space.
+  if (level !== "error" && level !== "warn") {
+    if (listHeader.test(body)) {
+      pieces.push(
+        <span key="body" className="c-heading">
+          {body}
+        </span>,
+      );
+      return { node: pieces, level, list: true };
+    }
+    if (inList && /^\s+\S/.test(body)) {
+      pieces.push(<span key="body">{pluginList(body, health)}</span>);
+      return { node: pieces, level, list: true };
+    }
+  }
 
   const named = tag.exec(body);
   if (named) {
@@ -101,7 +149,7 @@ export function colourLine(line: string, health: Map<string, PluginHealth>, inhe
       {body}
     </span>,
   );
-  return { node: pieces, level };
+  return { node: pieces, level, list: false };
 }
 
 const tagTitle: Record<PluginHealth, string> = {

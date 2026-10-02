@@ -1731,3 +1731,13 @@ pre.command {
 .c-muted {
   color: #8496ab;
 }
+
+.c-tag.unknown {
+  color: inherit;
+  font-weight: 400;
+}
+
+.c-heading {
+  color: #ffffff;
+  font-weight: 600;
+}
