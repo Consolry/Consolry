@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/huin/goupnp/dcps/internetgateway2"
@@ -17,6 +19,7 @@ import (
 type gateway interface {
 	AddPortMappingCtx(ctx context.Context, remoteHost string, externalPort uint16, protocol string, internalPort uint16, internalClient string, enabled bool, description string, leaseSeconds uint32) error
 	DeletePortMappingCtx(ctx context.Context, remoteHost string, externalPort uint16, protocol string) error
+	GetSpecificPortMappingEntryCtx(ctx context.Context, remoteHost string, externalPort uint16, protocol string) (internalPort uint16, internalClient string, enabled bool, description string, leaseSeconds uint32, err error)
 	GetExternalIPAddressCtx(ctx context.Context) (string, error)
 	LocalAddr() net.IP
 }
@@ -56,6 +59,20 @@ type forwardResult struct {
 	Reachable bool `json:"reachable"`
 }
 
+// routerSays turns a router's refusal into a sentence. Routers answer with numbered UPnP errors.
+func routerSays(err error, port int) error {
+	text := err.Error()
+	switch {
+	case strings.Contains(text, "<errorCode>718<"):
+		return fmt.Errorf("your router already has a rule for port %d that Consolry cannot see or change, most likely one added by hand in the router's own settings. If that rule points at this machine, the port is already open. Otherwise remove it in the router, or give the server a different port", port)
+	case strings.Contains(text, "<errorCode>606<"):
+		return errors.New("your router does not allow programs to open ports. Look for a UPnP or \"secure mode\" setting in the router")
+	case strings.Contains(text, "<errorCode>724<"), strings.Contains(text, "<errorCode>716<"):
+		return fmt.Errorf("your router will not forward port %d. Try a different port for the server", port)
+	}
+	return errors.New("your router refused to open the port: " + text)
+}
+
 // forwardPort asks the router to send a TCP port from the internet to this machine.
 func forwardPort(ctx context.Context, port int) (forwardResult, error) {
 	router, err := findGateway(ctx)
@@ -63,17 +80,31 @@ func forwardPort(ctx context.Context, port int) (forwardResult, error) {
 		return forwardResult{}, err
 	}
 	local := router.LocalAddr().String()
+	external, _ := router.GetExternalIPAddressCtx(ctx)
+	result := forwardResult{Port: port, InternalIP: local, ExternalIP: external, Reachable: reachable(external)}
+
+	// The port may already be forwarded: by an earlier run, or to this machine under an address it used to have.
+	if internalPort, client, enabled, description, _, err := router.GetSpecificPortMappingEntryCtx(ctx, "", uint16(port), "TCP"); err == nil {
+		if client == local && int(internalPort) == port && enabled {
+			return result, nil
+		}
+		if client != local {
+			return forwardResult{}, fmt.Errorf("port %d is already forwarded on your router to another device (%s, labelled %q). Remove that rule in the router, or give this server a different port", port, client, description)
+		}
+		// It points at this machine but at the wrong port or switched off: replace it.
+		_ = router.DeletePortMappingCtx(ctx, "", uint16(port), "TCP")
+	}
+
 	// A lease of 0 means "until removed". Some routers insist on a time limit, so fall back to a week;
 	// the panel asks again every time the server starts.
 	err = router.AddPortMappingCtx(ctx, "", uint16(port), "TCP", uint16(port), local, true, "Consolry", 0)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "<errorCode>718<") {
 		err = router.AddPortMappingCtx(ctx, "", uint16(port), "TCP", uint16(port), local, true, "Consolry", 7*24*3600)
 	}
 	if err != nil {
-		return forwardResult{}, errors.New("your router refused to open the port: " + err.Error())
+		return forwardResult{}, routerSays(err, port)
 	}
-	external, _ := router.GetExternalIPAddressCtx(ctx)
-	return forwardResult{Port: port, InternalIP: local, ExternalIP: external, Reachable: reachable(external)}, nil
+	return result, nil
 }
 
 func unforwardPort(ctx context.Context, port int) error {
