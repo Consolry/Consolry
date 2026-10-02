@@ -31,6 +31,14 @@ CREATE TABLE IF NOT EXISTS nodes (
 	url   TEXT NOT NULL,
 	token TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS activity (
+	id        INTEGER PRIMARY KEY,
+	server_id TEXT NOT NULL,
+	at        INTEGER NOT NULL,
+	user      TEXT NOT NULL,
+	text      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS activity_server ON activity (server_id, id);
 CREATE TABLE IF NOT EXISTS schedules (
 	id          INTEGER PRIMARY KEY,
 	server_id   TEXT NOT NULL,
@@ -259,6 +267,7 @@ func (s *Store) DeleteServer(id string) error {
 	if _, err := s.db.Exec(`DELETE FROM schedules WHERE server_id = ?`, id); err != nil {
 		return err
 	}
+	_, _ = s.db.Exec(`DELETE FROM activity WHERE server_id = ?`, id)
 	_, err := s.db.Exec(`DELETE FROM servers WHERE id = ?`, id)
 	return err
 }

@@ -7,13 +7,15 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/DinoNaedYT/Consolry/internal/minecraft"
 )
 
-func queryEscape(value string) string { return url.QueryEscape(value) }
+func queryEscape(value string) string            { return url.QueryEscape(value) }
+func queryUnescape(value string) (string, error) { return url.QueryUnescape(value) }
 
 // --- version catalogue ---
 
@@ -188,12 +190,17 @@ func (a *App) handlePluginSearch(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	projects, err := minecraft.Search(r.Context(), r.URL.Query().Get("q"), software, row.MCVersion)
+	const pageSize = 16
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 0 || page > 500 {
+		page = 0
+	}
+	projects, total, err := minecraft.Search(r.Context(), r.URL.Query().Get("q"), software, row.MCVersion, page*pageSize, pageSize)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "could not search Modrinth: "+err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, projects)
+	writeJSON(w, http.StatusOK, map[string]any{"projects": projects, "total": total, "pageSize": pageSize})
 }
 
 // installProject installs the newest suitable version of a project, then anything it requires.
@@ -261,6 +268,7 @@ func (a *App) handlePluginInstall(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
+	a.log(r, row.ID, "Installed "+strings.Join(installed, ", "))
 	writeJSON(w, http.StatusOK, map[string]any{"installed": installed})
 }
 
@@ -313,6 +321,7 @@ func (a *App) handlePluginUpdate(w http.ResponseWriter, r *http.Request) {
 	if file.Filename != current.Name {
 		_ = node.call(r.Context(), http.MethodDelete, "/servers/"+row.ID+"/files?path="+queryEscape(software.Folder+"/"+current.Name), nil, nil)
 	}
+	a.log(r, row.ID, "Updated "+current.Name+" to "+file.Filename)
 	writeJSON(w, http.StatusOK, map[string]string{"file": file.Filename})
 }
 

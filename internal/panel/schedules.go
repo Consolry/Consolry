@@ -257,7 +257,9 @@ func (a *App) StartScheduler(ctx context.Context) {
 					// Record the run before starting it, so a slow job is never started twice.
 					a.store.markScheduleRun(schedule.ID, now, "Running…")
 					go func(schedule Schedule) {
-						a.store.markScheduleRun(schedule.ID, now, a.runSchedule(ctx, schedule))
+						result := a.runSchedule(ctx, schedule)
+						a.store.markScheduleRun(schedule.ID, now, result)
+						a.store.Log(schedule.ServerID, "schedule", "Scheduled "+schedule.Action+": "+result)
 					}(schedule)
 				}
 			}
@@ -305,6 +307,7 @@ func (a *App) handleCreateSchedule(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	a.log(r, row.ID, "Added a schedule ("+created.Action+")")
 	writeJSON(w, http.StatusCreated, created)
 }
 
@@ -361,5 +364,6 @@ func (a *App) handleRunSchedule(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	result := a.runSchedule(r.Context(), schedule)
 	a.store.markScheduleRun(schedule.ID, now, result)
+	a.log(r, schedule.ServerID, "Ran the "+schedule.Action+" schedule by hand: "+result)
 	writeJSON(w, http.StatusOK, map[string]string{"result": result})
 }

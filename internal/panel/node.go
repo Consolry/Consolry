@@ -23,6 +23,8 @@ type daemonSpec struct {
 	State       string   `json:"state,omitempty"`
 	StartedAt   int64    `json:"startedAt,omitempty"`
 	Java        int      `json:"java,omitempty"`
+	CPU         float64  `json:"cpu,omitempty"`
+	Memory      uint64   `json:"memory,omitempty"`
 }
 
 // call makes one quick request to a node's daemon and decodes the JSON reply into out.

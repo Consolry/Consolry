@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { api, stateLabel, uptime, type NodeInfo, type PanelState, type ServerInfo } from "./api";
 import NewServer from "./NewServer";
+import type { UsageHistory } from "./Dashboard";
 import ServerPage, { type Tab } from "./ServerPage";
 import { Empty, ErrorNote, useAction } from "./ui";
 
@@ -9,7 +10,7 @@ type View = { kind: "overview" } | { kind: "server"; id: string; tab: Tab } | { 
 // The address after # decides the page, so a refresh or a shared link lands in the same place.
 function parseHash(hash: string): View {
   const parts = hash.replace(/^#\/?/, "").split("/");
-  if (parts[0] === "servers" && parts[1]) return { kind: "server", id: parts[1], tab: (parts[2] || "console") as Tab };
+  if (parts[0] === "servers" && parts[1]) return { kind: "server", id: parts[1], tab: (parts[2] || "dashboard") as Tab };
   if (parts[0] === "new") return { kind: "new-server" };
   if (parts[0] === "nodes") return { kind: "nodes" };
   return { kind: "overview" };
@@ -137,7 +138,30 @@ function Panel({ username, version, onSignOut }: { username: string; version: st
   const view = useView();
   const now = useNow();
 
-  const loadServers = useCallback(() => api.servers().then(setServers, () => {}), []);
+  // A few minutes of CPU and memory readings per server, kept here so they survive switching tabs.
+  const history = useRef(new Map<string, UsageHistory>());
+
+  const loadServers = useCallback(
+    () =>
+      api.servers().then(
+        (list) => {
+          for (const server of list) {
+            const samples = history.current.get(server.id) ?? { cpu: [], memory: [] };
+            if (server.state === "running") {
+              samples.cpu = [...samples.cpu, server.cpu].slice(-90);
+              samples.memory = [...samples.memory, server.memory].slice(-90);
+            } else {
+              samples.cpu = [];
+              samples.memory = [];
+            }
+            history.current.set(server.id, samples);
+          }
+          setServers(list);
+        },
+        () => {},
+      ),
+    [],
+  );
   const loadNodes = useCallback(() => api.nodes().then(setNodes, () => {}), []);
 
   useEffect(() => {
@@ -218,6 +242,7 @@ function Panel({ username, version, onSignOut }: { username: string; version: st
             server={selected}
             tab={view.tab}
             now={now}
+            history={history.current.get(selected.id)}
             onChanged={loadServers}
             onDeleted={() => {
               location.hash = "#/";
@@ -328,7 +353,7 @@ function Overview({ servers, nodes, now, onChanged }: { servers: ServerInfo[]; n
                     </button>
                   )}
                   <a className="button" href={`#/servers/${server.id}`}>
-                    Console
+                    Open
                   </a>
                 </div>
               </li>

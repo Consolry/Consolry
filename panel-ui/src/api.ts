@@ -17,6 +17,24 @@ export type ServerInfo = {
   kind: "generic" | "minecraft";
   software: string;
   mcVersion: string;
+  /** Percentage of the whole machine's CPU. */
+  cpu: number;
+  /** Bytes of memory in use. */
+  memory: number;
+  memoryLimitMb: number;
+};
+export type Activity = { id: number; at: number; user: string; text: string };
+export type Network = { port: number; addresses: string[]; listening: boolean };
+export type Startup = {
+  command: string;
+  args: string[];
+  stopCommand: string;
+  memoryMb: number;
+  javaOptions: string[];
+  javaNeeded: number;
+  systemJava: string;
+  managedJava: number[];
+  recommended: string[];
 };
 export type Software = { id: string; name: string; about: string; folder: string };
 export type FileEntry = { name: string; dir: boolean; size: number; modified: number };
@@ -46,7 +64,7 @@ export type Players = {
   operators: string[];
   banned: { name: string; reason: string }[];
 };
-export type ServerPatch = { name?: string; memoryMb?: number; startCommand?: string; stopCommand?: string };
+export type ServerPatch = { name?: string; memoryMb?: number; startCommand?: string; stopCommand?: string; javaOptions?: string };
 export type Plugin = {
   file: string;
   size: number;
@@ -140,7 +158,11 @@ export const api = {
   backupUrl: (id: string, name: string) => `/api${node(id)}/backups/${name}`,
 
   plugins: (id: string) => request<PluginList>("GET", `/servers/${id}/plugins`),
-  searchPlugins: (id: string, query: string) => request<Project[]>("GET", `/servers/${id}/plugins/search?q=${q(query)}`),
+  searchPlugins: (id: string, query: string, page: number) =>
+    request<{ projects: Project[]; total: number; pageSize: number }>("GET", `/servers/${id}/plugins/search?q=${q(query)}&page=${page}`),
+  activity: (id: string, limit: number) => request<Activity[]>("GET", `/servers/${id}/activity?limit=${limit}`),
+  network: (id: string) => request<Network>("GET", `/servers/${id}/network`),
+  startup: (id: string) => request<Startup>("GET", `/servers/${id}/startup`),
   installPlugin: (id: string, projectId: string) => request<{ installed: string[] }>("POST", `/servers/${id}/plugins/install`, { projectId }),
   updatePlugin: (id: string, file: string) => request<{ file: string }>("POST", `/servers/${id}/plugins/update`, { file }),
 };

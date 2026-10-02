@@ -47,10 +47,15 @@ type Server struct {
 	mu        sync.Mutex
 	state     State
 	startedAt time.Time
-	cmd       *exec.Cmd
-	stdin     io.WriteCloser
-	lines     []string
-	subs      map[chan string]struct{}
+
+	// The last CPU reading, kept so the next one can report use since then.
+	lastCPU    float64
+	lastSample time.Time
+	samplePid  int
+	cmd        *exec.Cmd
+	stdin      io.WriteCloser
+	lines      []string
+	subs       map[chan string]struct{}
 }
 
 func newServer(spec Spec, dir, javaDir string) *Server {

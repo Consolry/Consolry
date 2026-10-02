@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"strconv"
+	"strings"
 )
 
 const modrinth = "https://api.modrinth.com/v2"
@@ -75,7 +77,8 @@ func jsonList(values []string) string {
 }
 
 // Search finds plugins or mods that run on the given software and Minecraft version.
-func Search(ctx context.Context, query string, software Software, gameVersion string) ([]Project, error) {
+// Results are paged; total is how many projects match in all.
+func Search(ctx context.Context, query string, software Software, gameVersion string, offset, limit int) (projects []Project, total int, err error) {
 	loaderFacet := make([]string, len(software.Loaders))
 	for i, loader := range software.Loaders {
 		loaderFacet[i] = "categories:" + loader
@@ -86,7 +89,15 @@ func Search(ctx context.Context, query string, software Software, gameVersion st
 	}
 	facetJSON, _ := json.Marshal(facets)
 
-	params := url.Values{"query": {query}, "limit": {"20"}, "facets": {string(facetJSON)}}
+	// With nothing typed, show the most downloaded; otherwise the best matches.
+	index := "relevance"
+	if strings.TrimSpace(query) == "" {
+		index = "downloads"
+	}
+	params := url.Values{
+		"query": {query}, "index": {index}, "facets": {string(facetJSON)},
+		"limit": {strconv.Itoa(limit)}, "offset": {strconv.Itoa(offset)},
+	}
 	var reply struct {
 		Hits []struct {
 			ProjectID   string `json:"project_id"`
@@ -96,15 +107,16 @@ func Search(ctx context.Context, query string, software Software, gameVersion st
 			Downloads   int    `json:"downloads"`
 			IconURL     string `json:"icon_url"`
 		} `json:"hits"`
+		Total int `json:"total_hits"`
 	}
 	if err := getJSON(ctx, modrinth+"/search?"+params.Encode(), nil, &reply); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	projects := make([]Project, len(reply.Hits))
+	projects = make([]Project, len(reply.Hits))
 	for i, hit := range reply.Hits {
 		projects[i] = Project{ID: hit.ProjectID, Title: hit.Title, Description: hit.Description, Author: hit.Author, Downloads: hit.Downloads, IconURL: hit.IconURL}
 	}
-	return projects, nil
+	return projects, reply.Total, nil
 }
 
 // Latest returns the newest version of a project that runs on the given software and Minecraft version.

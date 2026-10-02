@@ -193,6 +193,26 @@ func javaFor(ctx context.Context, version string) int {
 	}
 }
 
+// RecommendedFlags returns the Java options Paper suggests for a Minecraft version, or none if it publishes none.
+func RecommendedFlags(ctx context.Context, version string) []string {
+	var reply struct {
+		Version struct {
+			Java struct {
+				Flags struct {
+					Recommended []string `json:"recommended"`
+				} `json:"flags"`
+			} `json:"java"`
+		} `json:"version"`
+	}
+	if !isRelease(version) || getJSON(ctx, "https://fill.papermc.io/v3/projects/paper/versions/"+url.PathEscape(version), nil, &reply) != nil {
+		return []string{}
+	}
+	if reply.Version.Java.Flags.Recommended == nil {
+		return []string{}
+	}
+	return reply.Version.Java.Flags.Recommended
+}
+
 // Resolve finds the newest build of a server for one Minecraft version.
 func Resolve(ctx context.Context, software, version string) (Download, error) {
 	if !isRelease(version) {

@@ -11,84 +11,37 @@ export default function Settings({ server, onChanged, onDeleted }: Props) {
       {live && <p className="note">Some settings can only be changed while the server is stopped.</p>}
       <General server={server} live={live} onChanged={onChanged} />
       {server.kind === "minecraft" && <VersionSwitch server={server} live={live} onChanged={onChanged} />}
-      {server.kind === "minecraft" && <GameSettings server={server} />}
       <Remove server={server} live={live} onDeleted={onDeleted} />
     </section>
   );
 }
 
-const memoryChoices = [1, 2, 3, 4, 6, 8, 12, 16, 24, 32];
-
-function currentMemory(args: string[]) {
-  const match = args.join(" ").match(/-Xmx(\d+)([MG])/i);
-  if (!match) return 0;
-  return match[2].toUpperCase() === "G" ? Number(match[1]) * 1024 : Number(match[1]);
-}
-
-function General({ server, live, onChanged }: { server: ServerInfo; live: boolean; onChanged: () => void }) {
-  const minecraft = server.kind === "minecraft";
-  const startLine = [server.command, ...server.args].join(" ");
+function General({ server, onChanged }: { server: ServerInfo; live: boolean; onChanged: () => void }) {
   const [name, setName] = useState(server.name);
-  const [memory, setMemory] = useState(currentMemory(server.args));
-  const [startCommand, setStartCommand] = useState(startLine);
-  const [stopCommand, setStopCommand] = useState(server.stopCommand);
   const [saved, setSaved] = useState(false);
   const { error, busy, run } = useAction();
 
   function submit(event: FormEvent) {
     event.preventDefault();
     setSaved(false);
-    const patch: Parameters<typeof api.updateServer>[1] = {};
-    if (name.trim() !== server.name) patch.name = name.trim();
-    if (minecraft && memory !== currentMemory(server.args)) patch.memoryMb = memory;
-    if (!minecraft && startCommand !== startLine) patch.startCommand = startCommand;
-    if (!minecraft && stopCommand !== server.stopCommand) patch.stopCommand = stopCommand;
-    if (Object.keys(patch).length === 0) return;
-    run("save", () => api.updateServer(server.id, patch), () => {
+    if (name.trim() === server.name) return;
+    run("save", () => api.updateServer(server.id, { name: name.trim() }), () => {
       setSaved(true);
       onChanged();
     });
   }
 
-  const options = memoryChoices.map((gb) => gb * 1024);
-  if (memory && !options.includes(memory)) options.push(memory);
-
   return (
     <form className="card form" onSubmit={submit}>
-      <h2>General</h2>
+      <h2>Name</h2>
       <label>
-        Name
+        Server name
         <input value={name} onChange={(event) => setName(event.target.value)} required />
+        <small>Only shown in this panel. Memory and the start command are on the Startup page.</small>
       </label>
-      {minecraft ? (
-        <label>
-          Memory
-          <select value={memory} onChange={(event) => setMemory(Number(event.target.value))} disabled={live}>
-            {options
-              .sort((a, b) => a - b)
-              .map((mb) => (
-                <option key={mb} value={mb}>
-                  {mb % 1024 === 0 ? `${mb / 1024} GB` : `${mb} MB`}
-                </option>
-              ))}
-          </select>
-          <small>How much memory Java may use. Leave some free for the rest of this machine.</small>
-        </label>
-      ) : (
-        <>
-          <label>
-            Start command
-            <input className="mono" value={startCommand} onChange={(event) => setStartCommand(event.target.value)} disabled={live} required spellCheck={false} />
-          </label>
-          <label>
-            Stop command
-            <input className="mono" value={stopCommand} onChange={(event) => setStopCommand(event.target.value)} disabled={live} spellCheck={false} />
-          </label>
-        </>
-      )}
       <ErrorNote message={error} />
       {saved && <p className="note">Saved.</p>}
-      <button className="primary" disabled={busy !== ""}>
+      <button className="primary" disabled={busy !== "" || name.trim() === server.name}>
         Save
       </button>
     </form>
@@ -223,7 +176,7 @@ function applyProperties(text: string, changes: Record<string, string>) {
   return lines.join("\n") + "\n";
 }
 
-function GameSettings({ server }: { server: ServerInfo }) {
+export function GameSettings({ server }: { server: ServerInfo }) {
   const [original, setOriginal] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});

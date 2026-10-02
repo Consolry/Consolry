@@ -77,6 +77,11 @@ func (a *App) handleNodeProxy(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set(header, value)
 		}
 	}
+	if res.StatusCode < 300 {
+		if line := describePass(r.Method, rest, r.URL.RawQuery); line != "" {
+			a.log(r, row.ID, line)
+		}
+	}
 	w.WriteHeader(res.StatusCode)
 	_, _ = io.Copy(w, res.Body)
 }

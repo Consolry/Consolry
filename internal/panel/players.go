@@ -196,6 +196,7 @@ func (a *App) handlePlayerAction(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "start the server to manage players: "+err.Error())
 		return
 	}
+	a.log(r, row.ID, "Ran the player command: "+command)
 	// Give the server a moment to write its lists before the page reloads them.
 	time.Sleep(400 * time.Millisecond)
 	w.WriteHeader(http.StatusNoContent)

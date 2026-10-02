@@ -19,6 +19,9 @@ type Info struct {
 	Spec
 	State     State `json:"state"`
 	StartedAt int64 `json:"startedAt"`
+	// CPU is a percentage of the whole machine; Memory is in bytes.
+	CPU    float64 `json:"cpu"`
+	Memory uint64  `json:"memory"`
 }
 
 // Manager owns every server on this machine and remembers them across restarts.
@@ -107,7 +110,9 @@ func (m *Manager) List() []Info {
 	defer m.mu.Unlock()
 	list := make([]Info, 0, len(m.servers))
 	for _, s := range m.servers {
-		list = append(list, Info{Spec: s.spec, State: s.State(), StartedAt: s.StartedAt()})
+		info := Info{Spec: s.spec, State: s.State(), StartedAt: s.StartedAt()}
+		info.CPU, info.Memory = s.Usage()
+		list = append(list, info)
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
 	return list

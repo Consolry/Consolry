@@ -1,19 +1,33 @@
 import { useEffect, useState } from "react";
-import { api, stateLabel, uptime, type Finding, type PowerAction, type ServerInfo } from "./api";
+import { api, stateLabel, type Finding, type PowerAction, type ServerInfo } from "./api";
 import Backups from "./Backups";
 import Console from "./Console";
+import Dashboard, { type UsageHistory } from "./Dashboard";
 import Files from "./Files";
+import { ActivityPage, NetworkPage, StartupPage } from "./Pages";
 import Players from "./Players";
 import Plugins from "./Plugins";
 import Schedules from "./Schedules";
-import Settings from "./Settings";
+import Settings, { GameSettings } from "./Settings";
 import { ErrorNote, useAction } from "./ui";
 
-export type Tab = "console" | "files" | "plugins" | "players" | "backups" | "schedules" | "settings";
+export type Tab =
+  | "dashboard"
+  | "console"
+  | "activity"
+  | "plugins"
+  | "players"
+  | "game"
+  | "files"
+  | "backups"
+  | "network"
+  | "schedules"
+  | "startup"
+  | "settings";
 
-type Props = { server: ServerInfo; tab: Tab; now: number; onChanged: () => void; onDeleted: () => void };
+type Props = { server: ServerInfo; tab: Tab; now: number; history?: UsageHistory; onChanged: () => void; onDeleted: () => void };
 
-export default function ServerPage({ server, tab, now, onChanged, onDeleted }: Props) {
+export default function ServerPage({ server, tab, now, history, onChanged, onDeleted }: Props) {
   const { error, run } = useAction();
   const running = server.state === "running";
   const live = running || server.state === "stopping";
@@ -21,19 +35,24 @@ export default function ServerPage({ server, tab, now, onChanged, onDeleted }: P
   const power = (action: PowerAction) => run(action, () => api.power(server.id, action), onChanged);
 
   const tabs: { id: Tab; label: string }[] = [
+    { id: "dashboard", label: "Dashboard" },
     { id: "console", label: "Console" },
-    { id: "files", label: "Files" },
     ...(minecraft
       ? [
           { id: "plugins" as Tab, label: server.software === "fabric" ? "Mods" : "Plugins" },
           { id: "players" as Tab, label: "Players" },
+          { id: "game" as Tab, label: "Game settings" },
         ]
       : []),
+    { id: "files", label: "Files" },
     { id: "backups", label: "Backups" },
     { id: "schedules", label: "Schedules" },
+    { id: "network", label: "Network" },
+    { id: "startup", label: "Startup" },
+    { id: "activity", label: "Activity" },
     { id: "settings", label: "Settings" },
   ];
-  const current = tabs.some((item) => item.id === tab) ? tab : "console";
+  const current = tabs.some((item) => item.id === tab) ? tab : "dashboard";
 
   return (
     <>
@@ -63,37 +82,24 @@ export default function ServerPage({ server, tab, now, onChanged, onDeleted }: P
 
       <nav className="tabs" aria-label="Server sections">
         {tabs.map((item) => (
-          <a key={item.id} href={`#/servers/${server.id}${item.id === "console" ? "" : `/${item.id}`}`} aria-current={item.id === current ? "page" : undefined}>
+          <a key={item.id} href={`#/servers/${server.id}${item.id === "dashboard" ? "" : `/${item.id}`}`} aria-current={item.id === current ? "page" : undefined}>
             {item.label}
           </a>
         ))}
       </nav>
 
-      {current === "console" && (
-        <>
-          <dl className="tiles">
-            <div>
-              <dt>Uptime</dt>
-              <dd>{uptime(server.startedAt, now)}</dd>
-            </div>
-            <div>
-              <dt>Node</dt>
-              <dd>{server.nodeName}</dd>
-            </div>
-            <div className="wide">
-              <dt>Start command</dt>
-              <dd className="mono">{[server.command, ...server.args].join(" ") || "–"}</dd>
-            </div>
-          </dl>
-          <Diagnosis server={server} />
-          <Console serverId={server.id} running={running} />
-        </>
-      )}
-      {current === "files" && <Files serverId={server.id} />}
+      {(current === "dashboard" || current === "console") && <Diagnosis server={server} />}
+      {current === "dashboard" && <Dashboard server={server} now={now} history={history} />}
+      {current === "console" && <Console serverId={server.id} running={running} />}
+      {current === "activity" && <ActivityPage server={server} />}
       {current === "plugins" && <Plugins server={server} />}
       {current === "players" && <Players server={server} />}
+      {current === "game" && <GameSettings server={server} />}
+      {current === "files" && <Files serverId={server.id} />}
       {current === "backups" && <Backups server={server} />}
+      {current === "network" && <NetworkPage server={server} />}
       {current === "schedules" && <Schedules server={server} />}
+      {current === "startup" && <StartupPage server={server} onChanged={onChanged} />}
       {current === "settings" && <Settings server={server} onChanged={onChanged} onDeleted={onDeleted} />}
     </>
   );

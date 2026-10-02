@@ -54,6 +54,9 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("DELETE /api/servers/{id}", a.authed(a.handleDeleteServer))
 	mux.Handle("PATCH /api/servers/{id}", a.authed(a.handleUpdateServer))
 	mux.Handle("POST /api/servers/{id}/minecraft/version", a.authed(a.handleSwitchVersion))
+	mux.Handle("GET /api/servers/{id}/activity", a.authed(a.handleActivity))
+	mux.Handle("GET /api/servers/{id}/startup", a.authed(a.handleStartup))
+	mux.Handle("GET /api/servers/{id}/network", a.authed(a.handleNetwork))
 	mux.Handle("GET /api/servers/{id}/players", a.authed(a.handlePlayers))
 	mux.Handle("POST /api/servers/{id}/players", a.authed(a.handlePlayerAction))
 	mux.Handle("GET /api/servers/{id}/schedules", a.authed(a.handleSchedules))
@@ -324,6 +327,9 @@ type serverView struct {
 	Kind        string   `json:"kind"`
 	Software    string   `json:"software"`
 	MCVersion   string   `json:"mcVersion"`
+	CPU         float64  `json:"cpu"`
+	Memory      uint64   `json:"memory"`
+	MemoryLimit int      `json:"memoryLimitMb"`
 }
 
 func (a *App) handleServers(w http.ResponseWriter, r *http.Request) {
@@ -362,6 +368,7 @@ func (a *App) handleServers(w http.ResponseWriter, r *http.Request) {
 			if spec.Args != nil {
 				view.Args = spec.Args
 			}
+			view.CPU, view.Memory, view.MemoryLimit = spec.CPU, spec.Memory, memoryOf(spec.Args)
 		}
 		views[i] = view
 	}
@@ -452,6 +459,7 @@ func (a *App) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	a.log(r, id, "Created the server")
 	writeJSON(w, http.StatusCreated, map[string]string{"id": id, "warning": warning})
 }
 
@@ -506,6 +514,7 @@ func (a *App) handlePower(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
+	a.log(r, row.ID, map[string]string{"start": "Started the server", "stop": "Stopped the server", "kill": "Killed the server"}[input.Action])
 	writeJSON(w, http.StatusOK, result)
 }
 

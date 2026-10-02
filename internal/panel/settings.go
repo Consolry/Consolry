@@ -54,6 +54,8 @@ func (a *App) handleUpdateServer(w http.ResponseWriter, r *http.Request) {
 		MemoryMB     *int    `json:"memoryMb"`
 		StartCommand *string `json:"startCommand"`
 		StopCommand  *string `json:"stopCommand"`
+		// JavaOptions replaces the extra Java options, keeping the memory flags and what is run.
+		JavaOptions *string `json:"javaOptions"`
 	}
 	if !readJSON(w, r, &input) {
 		return
@@ -63,7 +65,7 @@ func (a *App) handleUpdateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if input.MemoryMB != nil || input.StartCommand != nil || input.StopCommand != nil {
+	if input.MemoryMB != nil || input.StartCommand != nil || input.StopCommand != nil || input.JavaOptions != nil {
 		spec, err := serverState(r.Context(), node, row.ID)
 		if err != nil {
 			writeError(w, http.StatusBadGateway, err.Error())
@@ -87,11 +89,32 @@ func (a *App) handleUpdateServer(w http.ResponseWriter, r *http.Request) {
 			}
 			spec.Args = memoryArgs(spec.Args, *input.MemoryMB)
 		}
+		if input.JavaOptions != nil && spec.Command == "java" {
+			_, tail := splitJavaArgs(spec.Args)
+			if len(tail) == 0 {
+				writeError(w, http.StatusBadRequest, "this start command has no -jar part to keep")
+				return
+			}
+			_, options := splitCommand("java " + *input.JavaOptions)
+			for _, option := range options {
+				if !strings.HasPrefix(option, "-") || option == "-jar" {
+					writeError(w, http.StatusBadRequest, "Java options must each start with a dash, and -jar is set for you")
+					return
+				}
+			}
+			memory := memoryOf(spec.Args)
+			spec.Args = append(append([]string{}, options...), tail...)
+			if memory > 0 {
+				spec.Args = memoryArgs(spec.Args, memory)
+			}
+		}
 		spec.State, spec.StartedAt = "", 0
+		spec.CPU, spec.Memory = 0, 0
 		if err := node.call(r.Context(), http.MethodPut, "/servers/"+row.ID, spec, nil); err != nil {
 			writeError(w, http.StatusConflict, err.Error())
 			return
 		}
+		a.log(r, row.ID, "Changed how the server starts")
 	}
 
 	if input.Name != nil {
@@ -149,7 +172,7 @@ func (a *App) handleSwitchVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	spec.Java, spec.State, spec.StartedAt = download.JavaMin, "", 0
+	spec.Java, spec.State, spec.StartedAt, spec.CPU, spec.Memory = download.JavaMin, "", 0, 0, 0
 	if err := node.call(r.Context(), http.MethodPut, "/servers/"+row.ID, spec, nil); err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -158,6 +181,7 @@ func (a *App) handleSwitchVersion(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	a.log(r, row.ID, "Switched to "+input.Software+" "+input.Version)
 	writeJSON(w, http.StatusOK, map[string]string{"warning": ensureJava(r.Context(), node, download.JavaMin)})
 }
 
