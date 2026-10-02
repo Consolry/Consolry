@@ -5,8 +5,9 @@ export const site = {
   version: "0.1.0",
   url: "https://www.consolry.com",
   name: "Consolry",
-  // The Buttondown account name, from buttondown.com/<name>. Empty means the waitlist is closed.
-  buttondownUsername: "",
+  // The EmailOctopus form ID: the long code in the form's embed snippet, after "eocampaign1.com/form/".
+  // Empty means the waitlist is closed.
+  emailOctopusFormId: "",
   github: "https://github.com/DinoNaedYT/Consolry",
   maintainer: { name: "DinoNaedYT", url: "https://github.com/DinoNaedYT" },
 };
