@@ -4,9 +4,25 @@ import (
 	"os"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/DinoNaedYT/Consolry/internal/testhelper"
 )
+
+func TestCleanLineIsAlwaysValidText(t *testing.T) {
+	// A plugin printing "»" in the Windows encoding: one byte, 0xBB, which is not valid UTF-8.
+	got := cleanLine("[05:27:12 INFO]: AxAuctions \xbb There is a new version available!")
+	if !utf8.ValidString(got) {
+		t.Fatalf("cleanLine returned invalid UTF-8: %q", got)
+	}
+	if want := "[05:27:12 INFO]: AxAuctions » There is a new version available!"; got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+	// Proper UTF-8 must pass through untouched.
+	if got := cleanLine("héllo » wörld ✓"); got != "héllo » wörld ✓" {
+		t.Errorf("valid UTF-8 was changed to %q", got)
+	}
+}
 
 func TestMain(m *testing.M) {
 	testhelper.RunEchoIfRequested()

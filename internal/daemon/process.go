@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 )
 
 type State string
@@ -198,9 +199,20 @@ func (s *Server) watch(cmd *exec.Cmd, r *os.File) {
 var colourCodes = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
 
 // cleanLine prepares one line of server output for the console: no trailing carriage
-// return, and no colour codes, which a browser would show as stray characters.
+// return, no colour codes, and always valid UTF-8.
 func cleanLine(line string) string {
-	return colourCodes.ReplaceAllString(strings.TrimRight(line, "\r"), "")
+	line = colourCodes.ReplaceAllString(strings.TrimRight(line, "\r"), "")
+	if utf8.ValidString(line) {
+		return line
+	}
+	// Servers on Windows often print in the system's own encoding, not UTF-8. A browser closes
+	// the console connection on a single invalid byte, so read such lines as Latin-1 instead,
+	// which also shows characters like » correctly.
+	runes := make([]rune, 0, len(line))
+	for i := 0; i < len(line); i++ {
+		runes = append(runes, rune(line[i]))
+	}
+	return string(runes)
 }
 
 // Stop asks the server to shut down cleanly, then kills it if it hasn't after stopTimeout.
