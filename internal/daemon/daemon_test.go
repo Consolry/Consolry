@@ -44,6 +44,14 @@ func waitState(t *testing.T, s *Server, want State) {
 	t.Fatalf("state is %q, want %q", s.State(), want)
 }
 
+func TestCleanLine(t *testing.T) {
+	got := cleanLine("[04:40:16 INFO]: \x1b[38;5;3mThere are \x1b[38;5;9m0\x1b[38;5;3m out of maximum \x1b[38;5;9m20\x1b[38;5;3m players online.\x1b[0m\r")
+	want := "[04:40:16 INFO]: There are 0 out of maximum 20 players online."
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
 func TestServerLifecycle(t *testing.T) {
 	m, err := NewManager(t.TempDir())
 	if err != nil {

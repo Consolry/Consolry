@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -133,7 +134,7 @@ func (s *Server) watch(cmd *exec.Cmd, r *os.File) {
 		scanner := bufio.NewScanner(r)
 		scanner.Buffer(make([]byte, 64*1024), 1024*1024)
 		for scanner.Scan() {
-			s.append(strings.TrimRight(scanner.Text(), "\r"))
+			s.append(cleanLine(scanner.Text()))
 		}
 	}()
 
@@ -159,6 +160,15 @@ func (s *Server) watch(cmd *exec.Cmd, r *os.File) {
 	}
 	s.cmd, s.stdin, s.startedAt = nil, nil, time.Time{}
 	s.appendLocked(fmt.Sprintf("[consolry] Server stopped (exit code %d)", code))
+}
+
+// colourCodes matches the terminal escape sequences servers use to colour their output.
+var colourCodes = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
+
+// cleanLine prepares one line of server output for the console: no trailing carriage
+// return, and no colour codes, which a browser would show as stray characters.
+func cleanLine(line string) string {
+	return colourCodes.ReplaceAllString(strings.TrimRight(line, "\r"), "")
 }
 
 // Stop asks the server to shut down cleanly, then kills it if it hasn't after stopTimeout.

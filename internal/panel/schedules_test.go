@@ -79,7 +79,23 @@ func TestPlayerNames(t *testing.T) {
 			t.Errorf("%q should be rejected", name)
 		}
 	}
-	if match := listReply.FindStringSubmatch("[21:20:04 INFO]: There are 2 of a max of 20 players online: Mossy_Kat, brickwren"); match == nil || match[1] != "2" || match[2] != "20" {
-		t.Errorf("the list reply was not understood: %v", match)
+	for _, line := range []string{
+		"[21:20:04 INFO]: There are 2 of a max of 20 players online: Mossy_Kat, brickwren",
+		"[04:40:16 INFO]: There are 2 out of maximum 20 players online.",
+	} {
+		if match := listReply.FindStringSubmatch(line); match == nil || match[1] != "2" || match[2] != "20" {
+			t.Errorf("the list reply %q was not understood: %v", line, match)
+		}
+	}
+
+	loading := []string{"[consolry] Server started", "[04:39:35 INFO]: Preparing level \"world\""}
+	if ready(loading) {
+		t.Error("a server still loading its world is not ready for commands")
+	}
+	if !ready(append(loading, "[04:40:03 INFO]: Done (66.030s)! For help, type \"help\"")) {
+		t.Error("a server that printed Done is ready")
+	}
+	if ready([]string{"[04:40:03 INFO]: Done (66.030s)!", "[consolry] Server stopped (exit code 0)", "[consolry] Server started"}) {
+		t.Error("Done from an earlier run must not count for the current one")
 	}
 }

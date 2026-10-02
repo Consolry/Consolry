@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -15,7 +16,37 @@ import (
 // It also keeps anything typed here from smuggling a second console command.
 var playerName = regexp.MustCompile(`^[A-Za-z0-9_.*]{1,32}$`)
 
-var listReply = regexp.MustCompile(`There are (\d+) of a max(?: of)? (\d+) players online:?(.*)$`)
+// listReply matches Minecraft's answer to "list", and the reworded one plugins such as EssentialsX give.
+var listReply = regexp.MustCompile(`There are (\d+) (?:of a max(?: of)?|out of maximum) (\d+) players online[:.]?(.*)$`)
+
+// started matches the line Minecraft prints once the world has loaded and commands are safe to run.
+var started = regexp.MustCompile(`Done \([0-9.,]+s\)`)
+
+// ready reports whether the server's current run has finished starting.
+func ready(lines []string) bool {
+	for i := len(lines) - 1; i >= 0; i-- {
+		if started.MatchString(lines[i]) {
+			return true
+		}
+		if strings.HasPrefix(lines[i], "[consolry] Server started") {
+			return false
+		}
+	}
+	return false
+}
+
+type onlineAnswer struct {
+	at    time.Time
+	names []string
+	limit int
+}
+
+// recentOnline remembers each server's last answer for a few seconds, so several pages
+// opening at once type "list" into the console once, not once each.
+var recentOnline = struct {
+	sync.Mutex
+	byServer map[string]onlineAnswer
+}{byServer: map[string]onlineAnswer{}}
 
 type bannedPlayer struct {
 	Name   string `json:"name"`
@@ -70,13 +101,31 @@ func property(data []byte, key string) string {
 	return ""
 }
 
-// onlinePlayers types "list" into the console and reads the answer out of the log.
-func onlinePlayers(ctx context.Context, node Node, id string) ([]string, int) {
+// onlinePlayers types the list command into the console and reads the answer out of the log.
+// command is "minecraft:list" where plugins may have replaced plain "list" with their own wording.
+func onlinePlayers(ctx context.Context, node Node, id, command string) ([]string, int) {
+	recentOnline.Lock()
+	defer recentOnline.Unlock()
+	if answer, ok := recentOnline.byServer[id]; ok && time.Since(answer.at) < 8*time.Second {
+		return answer.names, answer.limit
+	}
+	names, limit := askOnline(ctx, node, id, command)
+	if names != nil {
+		recentOnline.byServer[id] = onlineAnswer{at: time.Now(), names: names, limit: limit}
+	}
+	return names, limit
+}
+
+func askOnline(ctx context.Context, node Node, id, command string) ([]string, int) {
 	var before []string
 	if node.call(ctx, http.MethodGet, "/servers/"+id+"/console/history", nil, &before) != nil {
 		return nil, 0
 	}
-	if node.call(ctx, http.MethodPost, "/servers/"+id+"/command", map[string]string{"command": "list"}, nil) != nil {
+	// While the world is still loading, commands fail with an error in the log, so wait.
+	if !ready(before) {
+		return nil, 0
+	}
+	if node.call(ctx, http.MethodPost, "/servers/"+id+"/command", map[string]string{"command": command}, nil) != nil {
 		return nil, 0
 	}
 	last := ""
@@ -109,7 +158,7 @@ func onlinePlayers(ctx context.Context, node Node, id string) ([]string, int) {
 }
 
 func (a *App) handlePlayers(w http.ResponseWriter, r *http.Request) {
-	row, node, _, ok := a.minecraftServer(w, r)
+	row, node, software, ok := a.minecraftServer(w, r)
 	if !ok {
 		return
 	}
@@ -129,7 +178,12 @@ func (a *App) handlePlayers(w http.ResponseWriter, r *http.Request) {
 
 	if spec, err := serverState(r.Context(), node, row.ID); err == nil && spec.State == "running" {
 		view.Running = true
-		if names, limit := onlinePlayers(r.Context(), node, row.ID); names != nil {
+		// Plugin servers accept the namespaced form, which always gives Minecraft's own wording.
+		command := "list"
+		if software.Folder == "plugins" {
+			command = "minecraft:list"
+		}
+		if names, limit := onlinePlayers(r.Context(), node, row.ID, command); names != nil {
 			view.Online = names
 			if limit > 0 {
 				view.Max = limit
