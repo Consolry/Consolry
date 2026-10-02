@@ -179,7 +179,7 @@ func (m *Manager) prune(id, kind string, keep int) {
 
 // restoreBackup replaces the server folder's contents with the backup's.
 func (m *Manager) restoreBackup(s *Server, name string) error {
-	if state := s.State(); state == StateRunning || state == StateStopping {
+	if state := s.State(); state != StateOffline && state != StateCrashed {
 		return errors.New("stop the server before restoring a backup")
 	}
 	archive, err := zip.OpenReader(filepath.Join(m.backupDir(s.spec.ID), name))

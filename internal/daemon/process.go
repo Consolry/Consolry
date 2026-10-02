@@ -17,8 +17,10 @@ import (
 type State string
 
 const (
-	StateOffline  State = "offline"
-	StateRunning  State = "running"
+	StateOffline State = "offline"
+	StateRunning State = "running"
+	// StateStarting is reported while the process runs but has not yet printed its ready line.
+	StateStarting State = "starting"
 	StateStopping State = "stopping"
 	StateCrashed  State = "crashed"
 )
@@ -53,20 +55,48 @@ type Server struct {
 	lastCPU    float64
 	lastSample time.Time
 	samplePid  int
-	cmd        *exec.Cmd
-	stdin      io.WriteCloser
-	lines      []string
-	subs       map[chan string]struct{}
+
+	// ready is set once the server prints its ready line; lastLine is its newest output.
+	ready    bool
+	lastLine string
+	cmd      *exec.Cmd
+	stdin    io.WriteCloser
+	lines    []string
+	subs     map[chan string]struct{}
 }
 
 func newServer(spec Spec, dir, javaDir string) *Server {
 	return &Server{spec: spec, dir: dir, javaDir: javaDir, state: StateOffline, subs: map[chan string]struct{}{}}
 }
 
+// minecraftReady matches the line a Minecraft server prints when the world has loaded.
+var minecraftReady = regexp.MustCompile(`Done \([0-9.,]+s\)`)
+
+var logPrefix = regexp.MustCompile(`^\[[^\]]*\]:? ?`)
+
 func (s *Server) State() State {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.stateLocked()
+}
+
+// stateLocked is the state shown to the outside. A Java server counts as starting,
+// not running, until it has printed its ready line.
+func (s *Server) stateLocked() State {
+	if s.state == StateRunning && s.spec.Java > 0 && !s.ready {
+		return StateStarting
+	}
 	return s.state
+}
+
+// Progress is the newest line of output while the server is starting, for showing what it is doing.
+func (s *Server) Progress() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.stateLocked() != StateStarting {
+		return ""
+	}
+	return s.lastLine
 }
 
 // StartedAt is when the running process was launched, as Unix seconds, or 0 if it isn't running.
@@ -122,6 +152,7 @@ func (s *Server) Start() error {
 	w.Close()
 
 	s.cmd, s.stdin, s.state, s.startedAt = cmd, stdin, StateRunning, time.Now()
+	s.ready, s.lastLine = false, ""
 	s.appendLocked("[consolry] Server started")
 	go s.watch(cmd, r)
 	return nil
@@ -245,6 +276,16 @@ func (s *Server) append(line string) {
 }
 
 func (s *Server) appendLocked(line string) {
+	if !s.ready && s.cmd != nil && !strings.HasPrefix(line, "[consolry]") {
+		if minecraftReady.MatchString(line) {
+			s.ready = true
+		} else if text := strings.TrimSpace(logPrefix.ReplaceAllString(line, "")); text != "" && !strings.HasPrefix(text, "WARNING:") && !strings.HasPrefix(text, "- ") {
+			if len(text) > 90 {
+				text = text[:90]
+			}
+			s.lastLine = text
+		}
+	}
 	s.lines = append(s.lines, line)
 	if len(s.lines) > maxLines {
 		s.lines = s.lines[len(s.lines)-maxLines:]

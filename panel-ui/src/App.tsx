@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { api, stateLabel, uptime, type NodeInfo, type PanelState, type ServerInfo } from "./api";
+import { api, isLive, stateLabel, uptime, type NodeInfo, type PanelState, type ServerInfo } from "./api";
 import NewServer from "./NewServer";
 import type { UsageHistory } from "./Dashboard";
 import ServerPage, { type Tab } from "./ServerPage";
@@ -324,7 +324,7 @@ function Overview({ servers, nodes, now, onChanged }: { servers: ServerInfo[]; n
       ) : (
         <ul className="servers">
           {servers.map((server) => {
-            const live = server.state === "running" || server.state === "stopping";
+            const live = isLive(server.state);
             return (
               <li key={server.id} className={`server ${server.state}`}>
                 <a href={`#/servers/${server.id}`} className="server-main">
@@ -344,7 +344,7 @@ function Overview({ servers, nodes, now, onChanged }: { servers: ServerInfo[]; n
                 </dl>
                 <div className="server-actions">
                   {live ? (
-                    <button disabled={server.state !== "running"} onClick={() => power(server.id, "stop")}>
+                    <button disabled={server.state === "stopping"} onClick={() => power(server.id, "stop")}>
                       Stop
                     </button>
                   ) : (

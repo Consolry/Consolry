@@ -180,7 +180,7 @@ func restart(ctx context.Context, node Node, id string) error {
 	if err != nil {
 		return err
 	}
-	if spec.State == "running" {
+	if spec.State == "running" || spec.State == "starting" {
 		if err := power(ctx, node, id, "stop"); err != nil {
 			return err
 		}
@@ -191,7 +191,7 @@ func restart(ctx context.Context, node Node, id string) error {
 		if err != nil {
 			return err
 		}
-		if spec.State != "running" && spec.State != "stopping" {
+		if spec.State == "offline" || spec.State == "crashed" {
 			break
 		}
 		if time.Now().After(deadline) {

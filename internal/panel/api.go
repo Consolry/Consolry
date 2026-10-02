@@ -330,6 +330,7 @@ type serverView struct {
 	CPU         float64  `json:"cpu"`
 	Memory      uint64   `json:"memory"`
 	MemoryLimit int      `json:"memoryLimitMb"`
+	Progress    string   `json:"progress"`
 }
 
 func (a *App) handleServers(w http.ResponseWriter, r *http.Request) {
@@ -368,7 +369,7 @@ func (a *App) handleServers(w http.ResponseWriter, r *http.Request) {
 			if spec.Args != nil {
 				view.Args = spec.Args
 			}
-			view.CPU, view.Memory, view.MemoryLimit = spec.CPU, spec.Memory, memoryOf(spec.Args)
+			view.CPU, view.Memory, view.MemoryLimit, view.Progress = spec.CPU, spec.Memory, memoryOf(spec.Args), spec.Progress
 		}
 		views[i] = view
 	}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, formatBytes, formatTime, type Backup, type ServerInfo } from "./api";
+import { api, formatBytes, formatTime, isLive, type Backup, type ServerInfo } from "./api";
 import { Empty, ErrorNote, useAction } from "./ui";
 
 export default function Backups({ server }: { server: ServerInfo }) {
@@ -7,7 +7,7 @@ export default function Backups({ server }: { server: ServerInfo }) {
   const [confirming, setConfirming] = useState<{ name: string; action: "restore" | "delete" } | null>(null);
   const [notice, setNotice] = useState("");
   const { error, busy, run, setError } = useAction();
-  const live = server.state === "running" || server.state === "stopping";
+  const live = isLive(server.state);
 
   const load = useCallback(() => {
     api.backups(server.id).then(setBackups, (problem) => setError((problem as Error).message));

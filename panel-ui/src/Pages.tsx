@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api, formatTime, type Activity, type Network, type ServerInfo, type Startup } from "./api";
+import { api, formatTime, isLive, type Activity, type Network, type ServerInfo, type Startup } from "./api";
 import { Empty, ErrorNote, useAction } from "./ui";
 
 /** Everything that has been done to this server, newest first. */
@@ -54,7 +54,7 @@ export function NetworkPage({ server }: { server: ServerInfo }) {
   const [saved, setSaved] = useState(false);
   const { error, busy, run, setError } = useAction();
   const minecraft = server.kind === "minecraft";
-  const live = server.state === "running" || server.state === "stopping";
+  const live = isLive(server.state);
 
   const load = useCallback(() => {
     api.network(server.id).then(
@@ -165,7 +165,7 @@ export function StartupPage({ server, onChanged }: { server: ServerInfo; onChang
   const [stopCommand, setStopCommand] = useState("");
   const [saved, setSaved] = useState(false);
   const { error, busy, run, setError } = useAction();
-  const live = server.state === "running" || server.state === "stopping";
+  const live = isLive(server.state);
 
   const load = useCallback(() => {
     api.startup(server.id).then(
@@ -240,8 +240,19 @@ export function StartupPage({ server, onChanged }: { server: ServerInfo; onChang
               <input className="mono" value={options} onChange={(event) => setOptions(event.target.value)} disabled={live} spellCheck={false} placeholder="None" />
               <small>Advanced. Memory and the server file are set for you; anything here is added between them.</small>
             </label>
+            {startup.fastStart.length > 0 && (
+              <button
+                type="button"
+                className="small"
+                disabled={live}
+                onClick={() => setOptions([...startup.fastStart, options].join(" ").trim())}
+                title="Java keeps a record of what it loaded and reuses it next time. Measured about 8% faster."
+              >
+                Add the faster-startup option
+              </button>
+            )}
             {startup.recommended.length > 0 && (
-              <button type="button" className="small" disabled={live} onClick={() => setOptions(startup.recommended.join(" "))}>
+              <button type="button" className="small" disabled={live} onClick={() => setOptions([...options.split(/\s+/).filter((item) => /SharedArchive|IgnoreUnrecognized/.test(item)), ...startup.recommended].join(" "))}>
                 Use Paper's recommended options
               </button>
             )}

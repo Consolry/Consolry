@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, stateLabel, type Finding, type PowerAction, type ServerInfo } from "./api";
+import { api, isLive, stateLabel, uptime, type Finding, type PowerAction, type ServerInfo } from "./api";
 import Backups from "./Backups";
 import Console from "./Console";
 import Dashboard, { type UsageHistory } from "./Dashboard";
@@ -30,13 +30,15 @@ type Props = { server: ServerInfo; tab: Tab; now: number; history?: UsageHistory
 export default function ServerPage({ server, tab, now, history, onChanged, onDeleted }: Props) {
   const { error, run } = useAction();
   const running = server.state === "running";
-  const live = running || server.state === "stopping";
+  const starting = server.state === "starting";
+  const live = isLive(server.state);
   const minecraft = server.kind === "minecraft";
   const power = (action: PowerAction) => run(action, () => api.power(server.id, action), onChanged);
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "dashboard", label: "Dashboard" },
     { id: "console", label: "Console" },
+    { id: "files", label: "Files" },
     ...(minecraft
       ? [
           { id: "plugins" as Tab, label: server.software === "fabric" ? "Mods" : "Plugins" },
@@ -44,7 +46,6 @@ export default function ServerPage({ server, tab, now, history, onChanged, onDel
           { id: "game" as Tab, label: "Game settings" },
         ]
       : []),
-    { id: "files", label: "Files" },
     { id: "backups", label: "Backups" },
     { id: "schedules", label: "Schedules" },
     { id: "network", label: "Network" },
@@ -70,7 +71,7 @@ export default function ServerPage({ server, tab, now, history, onChanged, onDel
           <button className="primary" disabled={live || server.state === "unreachable"} onClick={() => power("start")}>
             Start
           </button>
-          <button disabled={!running} onClick={() => power("stop")}>
+          <button disabled={!running && !starting} onClick={() => power("stop")}>
             Stop
           </button>
           <button className="danger" disabled={!live} onClick={() => power("kill")}>
@@ -79,6 +80,12 @@ export default function ServerPage({ server, tab, now, history, onChanged, onDel
         </div>
       </header>
       <ErrorNote message={error} />
+      {starting && (
+        <p className="starting" role="status">
+          <span className="pixel">Starting · {uptime(server.startedAt, now)}</span>
+          <span className="mono">{server.progress || "Launching Java…"}</span>
+        </p>
+      )}
 
       <nav className="tabs" aria-label="Server sections">
         {tabs.map((item) => (
@@ -90,7 +97,7 @@ export default function ServerPage({ server, tab, now, history, onChanged, onDel
 
       {(current === "dashboard" || current === "console") && <Diagnosis server={server} />}
       {current === "dashboard" && <Dashboard server={server} now={now} history={history} />}
-      {current === "console" && <Console serverId={server.id} running={running} />}
+      {current === "console" && <Console serverId={server.id} running={running || starting} />}
       {current === "activity" && <ActivityPage server={server} />}
       {current === "plugins" && <Plugins server={server} />}
       {current === "players" && <Players server={server} />}

@@ -109,7 +109,7 @@ func (a *App) handleUpdateServer(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		spec.State, spec.StartedAt = "", 0
-		spec.CPU, spec.Memory = 0, 0
+		spec.CPU, spec.Memory, spec.Progress = 0, 0, ""
 		if err := node.call(r.Context(), http.MethodPut, "/servers/"+row.ID, spec, nil); err != nil {
 			writeError(w, http.StatusConflict, err.Error())
 			return
@@ -153,7 +153,7 @@ func (a *App) handleSwitchVersion(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	if spec.State == "running" || spec.State == "stopping" {
+	if spec.State != "offline" && spec.State != "crashed" {
 		writeError(w, http.StatusConflict, "stop the server before switching versions")
 		return
 	}
@@ -172,7 +172,7 @@ func (a *App) handleSwitchVersion(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	spec.Java, spec.State, spec.StartedAt, spec.CPU, spec.Memory = download.JavaMin, "", 0, 0, 0
+	spec.Java, spec.State, spec.StartedAt, spec.CPU, spec.Memory, spec.Progress = download.JavaMin, "", 0, 0, 0, ""
 	if err := node.call(r.Context(), http.MethodPut, "/servers/"+row.ID, spec, nil); err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return

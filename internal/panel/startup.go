@@ -52,6 +52,8 @@ type startupView struct {
 	SystemJava  string   `json:"systemJava"`
 	ManagedJava []int    `json:"managedJava"`
 	Recommended []string `json:"recommended"`
+	// FastStart is the option set that speeds up starting, offered when the server does not have it yet.
+	FastStart []string `json:"fastStart"`
 }
 
 func (a *App) handleStartup(w http.ResponseWriter, r *http.Request) {
@@ -87,8 +89,12 @@ func (a *App) handleStartup(w http.ResponseWriter, r *http.Request) {
 			view.ManagedJava = java.Managed
 		}
 	}
+	view.FastStart = []string{}
 	if row.Kind == "minecraft" && row.Software != "fabric" {
 		view.Recommended = minecraft.RecommendedFlags(r.Context(), row.MCVersion)
+		if !strings.Contains(strings.Join(spec.Args, " "), "SharedArchiveFile") {
+			view.FastStart = FastStartOptions
+		}
 	}
 	writeJSON(w, http.StatusOK, view)
 }

@@ -22,6 +22,8 @@ type Info struct {
 	// CPU is a percentage of the whole machine; Memory is in bytes.
 	CPU    float64 `json:"cpu"`
 	Memory uint64  `json:"memory"`
+	// Progress is the server's newest output line while it is starting.
+	Progress string `json:"progress,omitempty"`
 }
 
 // Manager owns every server on this machine and remembers them across restarts.
@@ -112,6 +114,7 @@ func (m *Manager) List() []Info {
 	for _, s := range m.servers {
 		info := Info{Spec: s.spec, State: s.State(), StartedAt: s.StartedAt()}
 		info.CPU, info.Memory = s.Usage()
+		info.Progress = s.Progress()
 		list = append(list, info)
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].ID < list[j].ID })
@@ -148,7 +151,7 @@ func (m *Manager) Remove(id string) error {
 	if !ok {
 		return ErrNotFound
 	}
-	if state := s.State(); state == StateRunning || state == StateStopping {
+	if state := s.State(); state != StateOffline && state != StateCrashed {
 		return errors.New("stop the server before removing it")
 	}
 	delete(m.servers, id)

@@ -1,7 +1,10 @@
 export type User = { id: number; username: string };
 export type PanelState = { setupNeeded: boolean; version: string; user: User | null };
 export type NodeInfo = { id: number; name: string; url: string; online: boolean; os?: string; version?: string };
-export type ServerState = "offline" | "running" | "stopping" | "crashed" | "unreachable";
+export type ServerState = "offline" | "starting" | "running" | "stopping" | "crashed" | "unreachable";
+
+/** True while the server's process exists: starting, running or shutting down. */
+export const isLive = (state: ServerState) => state === "starting" || state === "running" || state === "stopping";
 export type PowerAction = "start" | "stop" | "kill";
 export type ServerInfo = {
   id: string;
@@ -22,6 +25,8 @@ export type ServerInfo = {
   /** Bytes of memory in use. */
   memory: number;
   memoryLimitMb: number;
+  /** The server's newest output line while it is starting. */
+  progress: string;
 };
 export type Activity = { id: number; at: number; user: string; text: string };
 export type Network = { port: number; addresses: string[]; listening: boolean };
@@ -35,6 +40,7 @@ export type Startup = {
   systemJava: string;
   managedJava: number[];
   recommended: string[];
+  fastStart: string[];
 };
 export type Software = { id: string; name: string; about: string; folder: string };
 export type FileEntry = { name: string; dir: boolean; size: number; modified: number };
@@ -174,6 +180,7 @@ export function consoleSocket(serverId: string) {
 
 const stateLabels: Record<ServerState, string> = {
   running: "Running",
+  starting: "Starting",
   offline: "Offline",
   stopping: "Stopping",
   crashed: "Crashed",

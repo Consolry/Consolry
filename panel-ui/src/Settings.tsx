@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, type ServerInfo, type Software } from "./api";
+import { api, isLive, type ServerInfo, type Software } from "./api";
 import { ErrorNote, useAction } from "./ui";
 
 type Props = { server: ServerInfo; onChanged: () => void; onDeleted: () => void };
 
 export default function Settings({ server, onChanged, onDeleted }: Props) {
-  const live = server.state === "running" || server.state === "stopping";
+  const live = isLive(server.state);
   return (
     <section className="settings">
       {live && <p className="note">Some settings can only be changed while the server is stopped.</p>}
@@ -182,7 +182,7 @@ export function GameSettings({ server }: { server: ServerInfo }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
   const { error, busy, run } = useAction();
-  const running = server.state === "running";
+  const running = isLive(server.state);
 
   useEffect(() => {
     api.readFile(server.id, "server.properties").then(

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api, formatBytes, type PluginList, type Project, type ServerInfo } from "./api";
+import { api, formatBytes, isLive, type PluginList, type Project, type ServerInfo } from "./api";
 import { Empty, ErrorNote, useAction } from "./ui";
 
 function compact(count: number) {
@@ -18,7 +18,7 @@ export default function Plugins({ server }: { server: ServerInfo }) {
   const [notice, setNotice] = useState("");
   const [confirming, setConfirming] = useState("");
   const { error, busy, run, setError } = useAction();
-  const running = server.state === "running" || server.state === "stopping";
+  const running = isLive(server.state);
   const word = server.software === "fabric" ? "mod" : "plugin";
 
   const loadInstalled = useCallback(() => {

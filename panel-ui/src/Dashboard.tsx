@@ -41,7 +41,9 @@ export default function Dashboard({ server, now, history }: Props) {
         <div className={server.state === "crashed" ? "alert" : undefined}>
           <dt>Status</dt>
           <dd>{stateLabel(server.state)}</dd>
-          <p className="dim">{running ? `Up ${uptime(server.startedAt, now)}` : "Not running"}</p>
+          <p className="dim">
+            {running ? `Up ${uptime(server.startedAt, now)}` : server.state === "starting" ? `Loading for ${uptime(server.startedAt, now)}` : "Not running"}
+          </p>
         </div>
         <div>
           <dt>CPU</dt>

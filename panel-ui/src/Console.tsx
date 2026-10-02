@@ -27,6 +27,8 @@ export default function Console({ serverId, running }: { serverId: string; runni
         setConnected(true);
       };
       ws.onmessage = (event) => {
+        // A fresh start is worth seeing even if the reader had scrolled up through the last run.
+        if (String(event.data).startsWith("[consolry] Server started")) setFollowing(true);
         setLines((current) => {
           const next = [...current, String(event.data)];
           return next.length > maxLines ? next.slice(-maxLines) : next;

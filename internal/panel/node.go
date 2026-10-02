@@ -25,6 +25,7 @@ type daemonSpec struct {
 	Java        int      `json:"java,omitempty"`
 	CPU         float64  `json:"cpu,omitempty"`
 	Memory      uint64   `json:"memory,omitempty"`
+	Progress    string   `json:"progress,omitempty"`
 }
 
 // call makes one quick request to a node's daemon and decodes the JSON reply into out.

@@ -147,3 +147,36 @@ func TestRegistrySurvivesRestart(t *testing.T) {
 		t.Error("server should be gone after Remove")
 	}
 }
+
+func TestStartingUntilReady(t *testing.T) {
+	m, _ := NewManager(t.TempDir())
+	spec := echoSpec("slowstart")
+	spec.Java = 21 // marks it as a server that announces when it is ready
+	_ = m.Create(spec)
+	s, _ := m.Get("slowstart")
+	_, lines, cancel := s.Subscribe()
+	defer cancel()
+
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+	waitLine(t, lines, "ready")
+	if got := s.State(); got != StateStarting {
+		t.Fatalf("state before the ready line is %q, want starting", got)
+	}
+	if got := s.Progress(); got != "ready" {
+		t.Errorf("progress is %q, want the newest output line", got)
+	}
+
+	_ = s.Send("Done (1.234s)! For help, type \"help\"")
+	waitState(t, s, StateRunning)
+	if got := s.Progress(); got != "" {
+		t.Errorf("progress should be empty once running, got %q", got)
+	}
+
+	// A server that is still starting can be stopped like any other.
+	if err := s.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	waitState(t, s, StateOffline)
+}

@@ -478,6 +478,7 @@ form label {
   background: var(--ok);
 }
 
+.dot.starting,
 .dot.stopping {
   background: var(--warn);
 }
@@ -503,6 +504,7 @@ form label {
   color: var(--ok);
 }
 
+.state.starting,
 .state.stopping {
   background: color-mix(in srgb, var(--warn) 18%, var(--surface));
   color: var(--warn);
@@ -601,6 +603,7 @@ form label {
   border-top-color: var(--ok);
 }
 
+.server.starting,
 .server.stopping {
   border-top-color: var(--warn);
 }
@@ -1563,4 +1566,27 @@ pre.command {
   font: 13px/1.6 var(--mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* Shown while a server is starting, so a quiet log never looks like a hang. */
+
+.starting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 8px 12px;
+  border-left: 4px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+}
+
+.starting .pixel {
+  color: var(--warn);
+}
+
+.starting .mono {
+  overflow: hidden;
+  color: var(--dim);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
