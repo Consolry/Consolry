@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
+	"github.com/DinoNaedYT/Consolry/internal/minecraft"
 )
 
 //go:embed all:web/dist
@@ -52,6 +54,15 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("DELETE /api/servers/{id}", a.authed(a.handleDeleteServer))
 	mux.Handle("POST /api/servers/{id}/power", a.authed(a.handlePower))
 	mux.Handle("GET /api/servers/{id}/console", a.authed(a.handleConsole))
+	mux.Handle("GET /api/servers/{id}/diagnosis", a.authed(a.handleDiagnosis))
+	mux.Handle("/api/servers/{id}/node/{rest...}", a.authed(a.handleNodeProxy))
+
+	mux.Handle("GET /api/minecraft/software", a.authed(a.handleMinecraftSoftware))
+	mux.Handle("GET /api/minecraft/versions", a.authed(a.handleMinecraftVersions))
+	mux.Handle("GET /api/servers/{id}/plugins", a.authed(a.handlePlugins))
+	mux.Handle("GET /api/servers/{id}/plugins/search", a.authed(a.handlePluginSearch))
+	mux.Handle("POST /api/servers/{id}/plugins/install", a.authed(a.handlePluginInstall))
+	mux.Handle("POST /api/servers/{id}/plugins/update", a.authed(a.handlePluginUpdate))
 
 	mux.Handle("/api/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
@@ -96,6 +107,15 @@ func (a *App) authed(next http.HandlerFunc) http.Handler {
 		if !ok {
 			writeError(w, http.StatusUnauthorized, "sign in first")
 			return
+		}
+		// A request that changes something must come from the panel's own pages, not another site.
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			if origin := r.Header.Get("Origin"); origin != "" {
+				if parsed, err := url.Parse(origin); err != nil || parsed.Host != r.Host {
+					writeError(w, http.StatusForbidden, "request came from another site")
+					return
+				}
+			}
 		}
 		next(w, r.WithContext(context.WithValue(r.Context(), userKey, user)))
 	})
@@ -292,6 +312,9 @@ type serverView struct {
 	Args        []string `json:"args"`
 	StopCommand string   `json:"stopCommand"`
 	StartedAt   int64    `json:"startedAt"`
+	Kind        string   `json:"kind"`
+	Software    string   `json:"software"`
+	MCVersion   string   `json:"mcVersion"`
 }
 
 func (a *App) handleServers(w http.ResponseWriter, r *http.Request) {
@@ -321,7 +344,10 @@ func (a *App) handleServers(w http.ResponseWriter, r *http.Request) {
 
 	views := make([]serverView, len(rows))
 	for i, row := range rows {
-		view := serverView{ID: row.ID, Name: row.Name, NodeID: row.NodeID, NodeName: names[row.NodeID], State: "unreachable", Args: []string{}}
+		view := serverView{
+			ID: row.ID, Name: row.Name, NodeID: row.NodeID, NodeName: names[row.NodeID], State: "unreachable", Args: []string{},
+			Kind: row.Kind, Software: row.Software, MCVersion: row.MCVersion,
+		}
 		if spec, ok := live[strconv.FormatInt(row.NodeID, 10)+"/"+row.ID]; ok {
 			view.State, view.Command, view.StopCommand, view.StartedAt = spec.State, spec.Command, spec.StopCommand, spec.StartedAt
 			if spec.Args != nil {
@@ -352,18 +378,18 @@ func newServerID(name string) (string, error) {
 
 func (a *App) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 	var input struct {
-		Name        string `json:"name"`
-		NodeID      int64  `json:"nodeId"`
-		StartLine   string `json:"startCommand"`
-		StopCommand string `json:"stopCommand"`
+		Name        string          `json:"name"`
+		NodeID      int64           `json:"nodeId"`
+		StartLine   string          `json:"startCommand"`
+		StopCommand string          `json:"stopCommand"`
+		Minecraft   *minecraftInput `json:"minecraft"`
 	}
 	if !readJSON(w, r, &input) {
 		return
 	}
 	input.Name = strings.TrimSpace(input.Name)
-	command, args := splitCommand(input.StartLine)
-	if input.Name == "" || command == "" {
-		writeError(w, http.StatusBadRequest, "a name and a start command are required")
+	if input.Name == "" {
+		writeError(w, http.StatusBadRequest, "give the server a name")
 		return
 	}
 	node, err := a.store.Node(input.NodeID)
@@ -376,17 +402,48 @@ func (a *App) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	spec := daemonSpec{ID: id, Command: command, Args: args, StopCommand: strings.TrimSpace(input.StopCommand)}
+
+	row := ServerRow{ID: id, Name: input.Name, NodeID: node.ID}
+	var spec daemonSpec
+	var download minecraft.Download
+	if input.Minecraft != nil {
+		spec, download, err = minecraftSpec(r.Context(), id, *input.Minecraft)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		row.Kind, row.Software, row.MCVersion = "minecraft", input.Minecraft.Software, input.Minecraft.Version
+	} else {
+		command, args := splitCommand(input.StartLine)
+		if command == "" {
+			writeError(w, http.StatusBadRequest, "a start command is required")
+			return
+		}
+		spec = daemonSpec{ID: id, Command: command, Args: args, StopCommand: strings.TrimSpace(input.StopCommand)}
+	}
+
 	if err := node.call(r.Context(), http.MethodPost, "/servers", spec, nil); err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
-	if err := a.store.CreateServer(ServerRow{ID: id, Name: input.Name, NodeID: node.ID}); err != nil {
-		_ = node.call(r.Context(), http.MethodDelete, "/servers/"+id, nil, nil)
+	// If anything after this fails, take the half-made server back off the node.
+	undo := func() { _ = node.call(context.WithoutCancel(r.Context()), http.MethodDelete, "/servers/"+id, nil, nil) }
+
+	warning := ""
+	if input.Minecraft != nil {
+		if err := installMinecraft(r.Context(), node, id, download); err != nil {
+			undo()
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		warning = javaWarning(r.Context(), node, download.JavaMin)
+	}
+	if err := a.store.CreateServer(row); err != nil {
+		undo()
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]string{"id": id})
+	writeJSON(w, http.StatusCreated, map[string]string{"id": id, "warning": warning})
 }
 
 // serverNode looks up a server and the node it lives on, answering 404 itself if either is missing.

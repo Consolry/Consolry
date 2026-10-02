@@ -24,8 +24,17 @@ type daemonSpec struct {
 	StartedAt   int64    `json:"startedAt,omitempty"`
 }
 
-// call makes one request to a node's daemon and decodes the JSON reply into out.
+// call makes one quick request to a node's daemon and decodes the JSON reply into out.
 func (n Node) call(ctx context.Context, method, path string, body, out any) error {
+	return n.callWith(daemonClient, ctx, method, path, body, out)
+}
+
+// slow is call without a time limit, for downloads and anything that reads whole files.
+func (n Node) slow(ctx context.Context, method, path string, body, out any) error {
+	return n.callWith(slowClient, ctx, method, path, body, out)
+}
+
+func (n Node) callWith(client *http.Client, ctx context.Context, method, path string, body, out any) error {
 	var reader io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -42,26 +51,34 @@ func (n Node) call(ctx context.Context, method, path string, body, out any) erro
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	res, err := daemonClient.Do(req)
+	res, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("could not reach the node: %w", err)
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode >= 400 {
-		var failure struct {
-			Error string `json:"error"`
-		}
-		_ = json.NewDecoder(res.Body).Decode(&failure)
-		if failure.Error == "" {
-			failure.Error = res.Status
-		}
-		return errors.New(failure.Error)
+	if err := daemonError(res); err != nil {
+		return err
 	}
 	if out == nil || res.StatusCode == http.StatusNoContent {
 		return nil
 	}
 	return json.NewDecoder(res.Body).Decode(out)
+}
+
+// daemonError turns a failed daemon reply into an error carrying the daemon's own message.
+func daemonError(res *http.Response) error {
+	if res.StatusCode < 400 {
+		return nil
+	}
+	var failure struct {
+		Error string `json:"error"`
+	}
+	_ = json.NewDecoder(res.Body).Decode(&failure)
+	if failure.Error == "" {
+		failure.Error = res.Status
+	}
+	return errors.New(failure.Error)
 }
 
 // consoleURL is the daemon's WebSocket address for a server's console.

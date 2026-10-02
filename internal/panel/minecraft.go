@@ -1,0 +1,341 @@
+package panel
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+	"sync"
+	"time"
+
+	"github.com/DinoNaedYT/Consolry/internal/minecraft"
+)
+
+func queryEscape(value string) string { return url.QueryEscape(value) }
+
+// --- version catalogue ---
+
+type versionCache struct {
+	mu      sync.Mutex
+	fetched map[string]time.Time
+	lists   map[string][]string
+}
+
+var versions = versionCache{fetched: map[string]time.Time{}, lists: map[string][]string{}}
+
+func (c *versionCache) get(ctx context.Context, software string) ([]string, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if list, ok := c.lists[software]; ok && time.Since(c.fetched[software]) < 15*time.Minute {
+		return list, nil
+	}
+	list, err := minecraft.Versions(ctx, software)
+	if err != nil {
+		if stale, ok := c.lists[software]; ok {
+			return stale, nil
+		}
+		return nil, err
+	}
+	c.lists[software], c.fetched[software] = list, time.Now()
+	return list, nil
+}
+
+func (a *App) handleMinecraftSoftware(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, minecraft.AllSoftware())
+}
+
+func (a *App) handleMinecraftVersions(w http.ResponseWriter, r *http.Request) {
+	software, ok := minecraft.FindSoftware(r.URL.Query().Get("software"))
+	if !ok {
+		writeError(w, http.StatusBadRequest, "unknown server software")
+		return
+	}
+	list, err := versions.get(r.Context(), software.ID)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "could not load the version list: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+// --- creating a Minecraft server ---
+
+type minecraftInput struct {
+	Software   string `json:"software"`
+	Version    string `json:"version"`
+	MemoryMB   int    `json:"memoryMb"`
+	AcceptEULA bool   `json:"acceptEula"`
+}
+
+// minecraftSpec works out how to run a Minecraft server and what must be downloaded first.
+func minecraftSpec(ctx context.Context, id string, input minecraftInput) (daemonSpec, minecraft.Download, error) {
+	if _, ok := minecraft.FindSoftware(input.Software); !ok {
+		return daemonSpec{}, minecraft.Download{}, errors.New("choose Paper, Purpur or Fabric")
+	}
+	if !input.AcceptEULA {
+		return daemonSpec{}, minecraft.Download{}, errors.New("you must accept the Minecraft EULA to create a Minecraft server")
+	}
+	if input.MemoryMB < 512 || input.MemoryMB > 262144 {
+		return daemonSpec{}, minecraft.Download{}, errors.New("memory must be between 512 MB and 256 GB")
+	}
+	download, err := minecraft.Resolve(ctx, input.Software, input.Version)
+	if err != nil {
+		return daemonSpec{}, minecraft.Download{}, fmt.Errorf("could not find that server version: %w", err)
+	}
+	memory := strconv.Itoa(input.MemoryMB) + "M"
+	spec := daemonSpec{
+		ID:          id,
+		Command:     "java",
+		Args:        []string{"-Xms" + memory, "-Xmx" + memory, "-jar", "server.jar", "nogui"},
+		StopCommand: "stop",
+	}
+	return spec, download, nil
+}
+
+// installMinecraft downloads the server jar and records the EULA acceptance on the node.
+func installMinecraft(ctx context.Context, node Node, id string, download minecraft.Download) error {
+	fetch := map[string]string{"url": download.URL, "path": "server.jar", "sha256": download.SHA256}
+	if err := node.slow(ctx, http.MethodPost, "/servers/"+id+"/files/fetch", fetch, nil); err != nil {
+		return fmt.Errorf("could not download the server: %w", err)
+	}
+	eula := "# Accepted through the Consolry panel when this server was created.\n# https://aka.ms/MinecraftEULA\neula=true\n"
+	return node.putFile(ctx, id, "eula.txt", []byte(eula))
+}
+
+// javaWarning says, in a sentence, if the node's Java cannot run this server.
+func javaWarning(ctx context.Context, node Node, needed int) string {
+	var java struct {
+		Found bool `json:"found"`
+		Major int  `json:"major"`
+	}
+	if node.call(ctx, http.MethodGet, "/java", nil, &java) != nil {
+		return ""
+	}
+	if !java.Found {
+		return fmt.Sprintf("Java isn't installed on this node. Install Java %d or newer before starting the server.", needed)
+	}
+	if java.Major < needed {
+		return fmt.Sprintf("This node has Java %d, but this version of Minecraft needs Java %d or newer. Update Java before starting the server.", java.Major, needed)
+	}
+	return ""
+}
+
+// --- plugins and mods ---
+
+// minecraftServer resolves a request's server and insists it is a Minecraft one.
+func (a *App) minecraftServer(w http.ResponseWriter, r *http.Request) (ServerRow, Node, minecraft.Software, bool) {
+	row, node, ok := a.serverNode(w, r)
+	if !ok {
+		return row, node, minecraft.Software{}, false
+	}
+	software, known := minecraft.FindSoftware(row.Software)
+	if row.Kind != "minecraft" || !known {
+		writeError(w, http.StatusBadRequest, "this is not a Minecraft server")
+		return row, node, minecraft.Software{}, false
+	}
+	return row, node, software, true
+}
+
+type hashedFile struct {
+	Name string `json:"name"`
+	Size int64  `json:"size"`
+	SHA1 string `json:"sha1"`
+}
+
+func installedFiles(ctx context.Context, node Node, id, folder string) ([]hashedFile, error) {
+	var files []hashedFile
+	err := node.slow(ctx, http.MethodGet, "/servers/"+id+"/files/hashes?suffix=.jar&path="+queryEscape(folder), nil, &files)
+	return files, err
+}
+
+type pluginView struct {
+	File      string `json:"file"`
+	Size      int64  `json:"size"`
+	Verified  bool   `json:"verified"`
+	ProjectID string `json:"projectId,omitempty"`
+	Title     string `json:"title,omitempty"`
+	IconURL   string `json:"iconUrl,omitempty"`
+	Version   string `json:"version,omitempty"`
+	Update    string `json:"update,omitempty"`
+}
+
+func (a *App) handlePlugins(w http.ResponseWriter, r *http.Request) {
+	row, node, software, ok := a.minecraftServer(w, r)
+	if !ok {
+		return
+	}
+	files, err := installedFiles(r.Context(), node, row.ID, software.Folder)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	sha1s := make([]string, len(files))
+	for i, file := range files {
+		sha1s[i] = file.SHA1
+	}
+
+	// If Modrinth can't be reached the files are still listed, just not identified.
+	known, lookupErr := minecraft.Identify(r.Context(), sha1s)
+	updates, _ := minecraft.Updates(r.Context(), sha1s, software, row.MCVersion)
+	var projectIDs []string
+	for _, version := range known {
+		projectIDs = append(projectIDs, version.ProjectID)
+	}
+	titles, _ := minecraft.Titles(r.Context(), projectIDs)
+
+	items := make([]pluginView, len(files))
+	for i, file := range files {
+		view := pluginView{File: file.Name, Size: file.Size}
+		if version, ok := known[file.SHA1]; ok {
+			view.Verified, view.ProjectID, view.Version = true, version.ProjectID, version.VersionNumber
+			view.Title, view.IconURL = titles[version.ProjectID].Title, titles[version.ProjectID].IconURL
+			if newer, ok := updates[file.SHA1]; ok && newer.ID != version.ID {
+				view.Update = newer.VersionNumber
+			}
+		}
+		items[i] = view
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"folder": software.Folder, "items": items, "lookupFailed": lookupErr != nil})
+}
+
+func (a *App) handlePluginSearch(w http.ResponseWriter, r *http.Request) {
+	row, _, software, ok := a.minecraftServer(w, r)
+	if !ok {
+		return
+	}
+	projects, err := minecraft.Search(r.Context(), r.URL.Query().Get("q"), software, row.MCVersion)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "could not search Modrinth: "+err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, projects)
+}
+
+// installProject installs the newest suitable version of a project, then anything it requires.
+func installProject(ctx context.Context, node Node, row ServerRow, software minecraft.Software, projectID string, have map[string]bool, installed *[]string) error {
+	if have[projectID] {
+		return nil
+	}
+	have[projectID] = true
+	version, found, err := minecraft.Latest(ctx, projectID, software, row.MCVersion)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return fmt.Errorf("there is no version for %s %s", software.Name, row.MCVersion)
+	}
+	file, ok := version.File()
+	if !ok {
+		return errors.New("that version has no file to download")
+	}
+	fetch := map[string]string{"url": file.URL, "path": software.Folder + "/" + file.Filename, "sha512": file.SHA512}
+	if err := node.slow(ctx, http.MethodPost, "/servers/"+row.ID+"/files/fetch", fetch, nil); err != nil {
+		return err
+	}
+	*installed = append(*installed, file.Filename)
+	for _, dependency := range version.RequiredProjects() {
+		if err := installProject(ctx, node, row, software, dependency, have, installed); err != nil {
+			return fmt.Errorf("a plugin it depends on could not be installed: %w", err)
+		}
+	}
+	return nil
+}
+
+func (a *App) handlePluginInstall(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		ProjectID string `json:"projectId"`
+	}
+	if !readJSON(w, r, &input) {
+		return
+	}
+	row, node, software, ok := a.minecraftServer(w, r)
+	if !ok {
+		return
+	}
+	// Anything already installed and recognised is not installed a second time as a dependency.
+	have := map[string]bool{}
+	if files, err := installedFiles(r.Context(), node, row.ID, software.Folder); err == nil {
+		sha1s := make([]string, len(files))
+		for i, file := range files {
+			sha1s[i] = file.SHA1
+		}
+		if known, err := minecraft.Identify(r.Context(), sha1s); err == nil {
+			for _, version := range known {
+				have[version.ProjectID] = true
+			}
+		}
+	}
+	delete(have, input.ProjectID)
+
+	installed := []string{}
+	if err := installProject(r.Context(), node, row, software, input.ProjectID, have, &installed); err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"installed": installed})
+}
+
+func (a *App) handlePluginUpdate(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		File string `json:"file"`
+	}
+	if !readJSON(w, r, &input) {
+		return
+	}
+	row, node, software, ok := a.minecraftServer(w, r)
+	if !ok {
+		return
+	}
+	files, err := installedFiles(r.Context(), node, row.ID, software.Folder)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	var current hashedFile
+	for _, file := range files {
+		if file.Name == input.File {
+			current = file
+		}
+	}
+	if current.Name == "" {
+		writeError(w, http.StatusNotFound, "that file is not installed")
+		return
+	}
+	updates, err := minecraft.Updates(r.Context(), []string{current.SHA1}, software, row.MCVersion)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "could not check Modrinth: "+err.Error())
+		return
+	}
+	file, ok := updates[current.SHA1].File()
+	if !ok || file.SHA1 == current.SHA1 {
+		writeError(w, http.StatusConflict, "this is already the newest version for this server")
+		return
+	}
+	fetch := map[string]string{"url": file.URL, "path": software.Folder + "/" + file.Filename, "sha512": file.SHA512}
+	if err := node.slow(r.Context(), http.MethodPost, "/servers/"+row.ID+"/files/fetch", fetch, nil); err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	// Remove the old jar only once the new one is safely in place.
+	if file.Filename != current.Name {
+		_ = node.call(r.Context(), http.MethodDelete, "/servers/"+row.ID+"/files?path="+queryEscape(software.Folder+"/"+current.Name), nil, nil)
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"file": file.Filename})
+}
+
+// --- crash explainer ---
+
+func (a *App) handleDiagnosis(w http.ResponseWriter, r *http.Request) {
+	row, node, ok := a.serverNode(w, r)
+	if !ok {
+		return
+	}
+	var lines []string
+	if err := node.call(r.Context(), http.MethodGet, "/servers/"+row.ID+"/console/history", nil, &lines); err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, minecraft.Explain(lines))
+}

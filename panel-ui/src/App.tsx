@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
-import { api, stateLabel, uptime, type NodeInfo, type PanelState, type PowerAction, type ServerInfo } from "./api";
-import Console from "./Console";
+import { api, stateLabel, uptime, type NodeInfo, type PanelState, type ServerInfo } from "./api";
+import NewServer from "./NewServer";
+import ServerPage, { type Tab } from "./ServerPage";
+import { Empty, ErrorNote, useAction } from "./ui";
 
-type View = { kind: "overview" } | { kind: "server"; id: string } | { kind: "new-server" } | { kind: "nodes" };
+type View = { kind: "overview" } | { kind: "server"; id: string; tab: Tab } | { kind: "new-server" } | { kind: "nodes" };
 
 // The address after # decides the page, so a refresh or a shared link lands in the same place.
 function parseHash(hash: string): View {
   const parts = hash.replace(/^#\/?/, "").split("/");
-  if (parts[0] === "servers" && parts[1]) return { kind: "server", id: parts[1] };
+  if (parts[0] === "servers" && parts[1]) return { kind: "server", id: parts[1], tab: (parts[2] || "console") as Tab };
   if (parts[0] === "new") return { kind: "new-server" };
   if (parts[0] === "nodes") return { kind: "nodes" };
   return { kind: "overview" };
@@ -131,6 +133,7 @@ function AuthForm({ mode, onDone }: { mode: "setup" | "login"; onDone: () => voi
 function Panel({ username, version, onSignOut }: { username: string; version: string; onSignOut: () => void }) {
   const [servers, setServers] = useState<ServerInfo[] | null>(null);
   const [nodes, setNodes] = useState<NodeInfo[] | null>(null);
+  const [warning, setWarning] = useState("");
   const view = useView();
   const now = useNow();
 
@@ -200,11 +203,20 @@ function Panel({ username, version, onSignOut }: { username: string; version: st
       </aside>
 
       <main className="content">
+        {warning && (
+          <p className="note warn">
+            {warning}{" "}
+            <button className="small" onClick={() => setWarning("")}>
+              Dismiss
+            </button>
+          </p>
+        )}
         {view.kind === "overview" && <Overview servers={servers} nodes={nodes} now={now} onChanged={loadServers} />}
         {view.kind === "server" && selected && (
           <ServerPage
             key={selected.id}
             server={selected}
+            tab={view.tab}
             now={now}
             onChanged={loadServers}
             onDeleted={() => {
@@ -221,7 +233,8 @@ function Panel({ username, version, onSignOut }: { username: string; version: st
         {view.kind === "new-server" && (
           <NewServer
             nodes={nodes}
-            onCreated={(id) => {
+            onCreated={(id, note) => {
+              setWarning(note);
               loadServers().then(() => {
                 location.hash = `#/servers/${id}`;
               });
@@ -234,41 +247,9 @@ function Panel({ username, version, onSignOut }: { username: string; version: st
   );
 }
 
-function Empty({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="empty-state">
-      <div className="blocks" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-      </div>
-      <h2>{title}</h2>
-      <p className="dim">{children}</p>
-      {action}
-    </div>
-  );
-}
-
-function usePower(onChanged: () => void) {
-  const [error, setError] = useState("");
-  const run = useCallback(
-    async (action: () => Promise<unknown>, after: () => void = onChanged) => {
-      setError("");
-      try {
-        await action();
-        after();
-      } catch (problem) {
-        setError((problem as Error).message);
-      }
-    },
-    [onChanged],
-  );
-  const power = (id: string, action: PowerAction) => run(() => api.power(id, action));
-  return { error, run, power };
-}
-
 function Overview({ servers, nodes, now, onChanged }: { servers: ServerInfo[]; nodes: NodeInfo[]; now: number; onChanged: () => void }) {
-  const { error, power } = usePower(onChanged);
+  const { error, run } = useAction();
+  const power = (id: string, action: "start" | "stop") => run(action, () => api.power(id, action), onChanged);
   const running = servers.filter((server) => server.state === "running").length;
   const trouble = servers.filter((server) => server.state === "crashed" || server.state === "unreachable").length;
   const online = nodes.filter((node) => node.online).length;
@@ -309,7 +290,7 @@ function Overview({ servers, nodes, now, onChanged }: { servers: ServerInfo[]; n
         </div>
       </dl>
 
-      {error && <p className="error" role="alert">{error}</p>}
+      <ErrorNote message={error} />
 
       {servers.length === 0 ? (
         <Empty title="No servers yet" action={<a className="button primary" href="#/new">Create a server</a>}>
@@ -324,7 +305,7 @@ function Overview({ servers, nodes, now, onChanged }: { servers: ServerInfo[]; n
                 <a href={`#/servers/${server.id}`} className="server-main">
                   <span className="server-name">{server.name}</span>
                   <span className={`state ${server.state}`}>{stateLabel(server.state)}</span>
-                  <code>{[server.command, ...server.args].join(" ") || "–"}</code>
+                  <code>{server.kind === "minecraft" ? `${server.software} ${server.mcVersion}` : [server.command, ...server.args].join(" ") || "–"}</code>
                 </a>
                 <dl>
                   <div>
@@ -355,142 +336,6 @@ function Overview({ servers, nodes, now, onChanged }: { servers: ServerInfo[]; n
           })}
         </ul>
       )}
-    </>
-  );
-}
-
-function ServerPage({ server, now, onChanged, onDeleted }: { server: ServerInfo; now: number; onChanged: () => void; onDeleted: () => void }) {
-  const { error, run, power } = usePower(onChanged);
-  const [confirming, setConfirming] = useState(false);
-  const running = server.state === "running";
-  const live = running || server.state === "stopping";
-
-  return (
-    <>
-      <header className="page-head">
-        <div className="title">
-          <h1>{server.name}</h1>
-          <span className={`state ${server.state}`}>{stateLabel(server.state)}</span>
-        </div>
-        <div className="actions">
-          <button className="primary" disabled={live || server.state === "unreachable"} onClick={() => power(server.id, "start")}>
-            Start
-          </button>
-          <button disabled={!running} onClick={() => power(server.id, "stop")}>
-            Stop
-          </button>
-          <button className="danger" disabled={!live} onClick={() => power(server.id, "kill")}>
-            Kill
-          </button>
-        </div>
-      </header>
-      {error && <p className="error" role="alert">{error}</p>}
-
-      <dl className="tiles">
-        <div>
-          <dt>Uptime</dt>
-          <dd>{uptime(server.startedAt, now)}</dd>
-        </div>
-        <div>
-          <dt>Node</dt>
-          <dd>{server.nodeName}</dd>
-        </div>
-        <div className="wide">
-          <dt>Start command</dt>
-          <dd className="mono">{[server.command, ...server.args].join(" ") || "–"}</dd>
-        </div>
-        <div>
-          <dt>Folder on the node</dt>
-          <dd className="mono">servers/{server.id}</dd>
-        </div>
-      </dl>
-
-      <Console serverId={server.id} running={running} />
-
-      <footer className="remove">
-        {confirming ? (
-          <>
-            <span>Remove {server.name} from the panel? Its files stay on the node.</span>
-            <button className="danger" onClick={() => run(() => api.deleteServer(server.id), onDeleted)}>
-              Remove
-            </button>
-            <button onClick={() => setConfirming(false)}>Cancel</button>
-          </>
-        ) : (
-          <button className="small" disabled={live} onClick={() => setConfirming(true)} title={live ? "Stop the server first" : undefined}>
-            Remove server
-          </button>
-        )}
-      </footer>
-    </>
-  );
-}
-
-function NewServer({ nodes, onCreated }: { nodes: NodeInfo[]; onCreated: (id: string) => void }) {
-  const [name, setName] = useState("");
-  const [nodeId, setNodeId] = useState(nodes[0]?.id ?? 0);
-  const [startCommand, setStartCommand] = useState("java -Xmx2G -jar server.jar nogui");
-  const [stopCommand, setStopCommand] = useState("stop");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  if (nodes.length === 0) {
-    return (
-      <Empty title="Add a node first" action={<a className="button primary" href="#/nodes">Add a node</a>}>
-        A server needs a node to run on.
-      </Empty>
-    );
-  }
-
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const { id } = await api.createServer({ name, nodeId: nodeId || nodes[0].id, startCommand, stopCommand });
-      onCreated(id);
-    } catch (problem) {
-      setError((problem as Error).message);
-      setBusy(false);
-    }
-  }
-
-  return (
-    <>
-      <header className="page-head">
-        <h1>New server</h1>
-      </header>
-      <form className="card form" onSubmit={submit}>
-        <label>
-          Name
-          <input value={name} onChange={(event) => setName(event.target.value)} required autoFocus />
-        </label>
-        <label>
-          Node
-          <select value={nodeId || nodes[0].id} onChange={(event) => setNodeId(Number(event.target.value))}>
-            {nodes.map((node) => (
-              <option key={node.id} value={node.id}>
-                {node.name}
-                {node.online ? "" : " (offline)"}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Start command
-          <input className="mono" value={startCommand} onChange={(event) => setStartCommand(event.target.value)} required spellCheck={false} />
-          <small>Runs inside the server's own folder on the node. Put the server files there before starting.</small>
-        </label>
-        <label>
-          Stop command
-          <input className="mono" value={stopCommand} onChange={(event) => setStopCommand(event.target.value)} spellCheck={false} />
-          <small>Typed into the console to shut down cleanly. Leave empty to end the process directly.</small>
-        </label>
-        {error && <p className="error" role="alert">{error}</p>}
-        <button className="primary" disabled={busy}>
-          Create server
-        </button>
-      </form>
     </>
   );
 }

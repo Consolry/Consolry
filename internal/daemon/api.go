@@ -115,6 +115,9 @@ func Handler(m *Manager, token, version string) http.Handler {
 		}
 	})
 
+	registerFiles(mux, m)
+	registerBackups(mux, m)
+
 	return requireToken(token, mux)
 }
 

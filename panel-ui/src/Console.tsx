@@ -8,6 +8,7 @@ export default function Console({ serverId, running }: { serverId: string; runni
   const [connected, setConnected] = useState(false);
   const [following, setFollowing] = useState(true);
   const [input, setInput] = useState("");
+  const [filter, setFilter] = useState("");
   const socket = useRef<WebSocket | null>(null);
   const output = useRef<HTMLPreElement>(null);
   const history = useRef<string[]>([]);
@@ -73,12 +74,23 @@ export default function Console({ serverId, running }: { serverId: string; runni
     }
   }
 
+  const needle = filter.trim().toLowerCase();
+  const shown = needle ? lines.filter((line) => line.toLowerCase().includes(needle)) : lines;
+
   return (
     <section className="console" aria-label="Console">
       <header>
         <span className="pixel">Console</span>
         <span className={connected ? "live on" : "live"}>{connected ? "Live" : "Reconnecting"}</span>
         <span className="count">{lines.length} lines</span>
+        <input
+          className="filter"
+          type="search"
+          value={filter}
+          onChange={(event) => setFilter(event.target.value)}
+          placeholder="Search the log"
+          aria-label="Search the log"
+        />
         {!following && (
           <button className="small" onClick={() => setFollowing(true)}>
             Jump to latest
@@ -88,8 +100,10 @@ export default function Console({ serverId, running }: { serverId: string; runni
       <pre ref={output} onScroll={onScroll} aria-label="Server output" tabIndex={0}>
         {lines.length === 0 ? (
           <span className="dim">{connected ? "No output yet. Start the server to see its log here." : "Connecting to the console…"}</span>
+        ) : shown.length === 0 ? (
+          <span className="dim">No lines contain "{filter}".</span>
         ) : (
-          lines.map((line, index) => (
+          shown.map((line, index) => (
             <span key={index} className={lineClass(line)}>
               {line + "\n"}
             </span>

@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"errors"
+	"strings"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -52,9 +53,12 @@ type Node struct {
 }
 
 type ServerRow struct {
-	ID     string
-	Name   string
-	NodeID int64
+	ID        string
+	Name      string
+	NodeID    int64
+	Kind      string // "generic" or "minecraft"
+	Software  string
+	MCVersion string
 }
 
 type Store struct{ db *sql.DB }
@@ -67,6 +71,18 @@ func OpenStore(path string) (*Store, error) {
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, err
+	}
+	// Columns added after the first version. SQLite has no "add if missing",
+	// so a "duplicate column" error just means an earlier run already did this.
+	for _, column := range []string{
+		"kind TEXT NOT NULL DEFAULT 'generic'",
+		"software TEXT NOT NULL DEFAULT ''",
+		"mc_version TEXT NOT NULL DEFAULT ''",
+	} {
+		if _, err := db.Exec("ALTER TABLE servers ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+			db.Close()
+			return nil, err
+		}
 	}
 	return &Store{db: db}, nil
 }
@@ -193,7 +209,7 @@ func (s *Store) DeleteNode(id int64) error {
 }
 
 func (s *Store) Servers() ([]ServerRow, error) {
-	rows, err := s.db.Query(`SELECT id, name, node_id FROM servers ORDER BY name`)
+	rows, err := s.db.Query(`SELECT id, name, node_id, kind, software, mc_version FROM servers ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +217,7 @@ func (s *Store) Servers() ([]ServerRow, error) {
 	servers := []ServerRow{}
 	for rows.Next() {
 		var row ServerRow
-		if err := rows.Scan(&row.ID, &row.Name, &row.NodeID); err != nil {
+		if err := rows.Scan(&row.ID, &row.Name, &row.NodeID, &row.Kind, &row.Software, &row.MCVersion); err != nil {
 			return nil, err
 		}
 		servers = append(servers, row)
@@ -211,12 +227,17 @@ func (s *Store) Servers() ([]ServerRow, error) {
 
 func (s *Store) Server(id string) (ServerRow, error) {
 	var row ServerRow
-	err := s.db.QueryRow(`SELECT id, name, node_id FROM servers WHERE id = ?`, id).Scan(&row.ID, &row.Name, &row.NodeID)
+	err := s.db.QueryRow(`SELECT id, name, node_id, kind, software, mc_version FROM servers WHERE id = ?`, id).
+		Scan(&row.ID, &row.Name, &row.NodeID, &row.Kind, &row.Software, &row.MCVersion)
 	return row, err
 }
 
 func (s *Store) CreateServer(row ServerRow) error {
-	_, err := s.db.Exec(`INSERT INTO servers (id, name, node_id) VALUES (?, ?, ?)`, row.ID, row.Name, row.NodeID)
+	if row.Kind == "" {
+		row.Kind = "generic"
+	}
+	_, err := s.db.Exec(`INSERT INTO servers (id, name, node_id, kind, software, mc_version) VALUES (?, ?, ?, ?, ?, ?)`,
+		row.ID, row.Name, row.NodeID, row.Kind, row.Software, row.MCVersion)
 	return err
 }
 
