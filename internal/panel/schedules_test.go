@@ -68,6 +68,25 @@ func TestMemoryArgs(t *testing.T) {
 	}
 }
 
+func TestWithColourOption(t *testing.T) {
+	got, added := withColourOption([]string{"-Xms2G", "-Xmx2G", "-jar", "server.jar", "nogui"})
+	want := []string{"-Xms2G", "-Xmx2G", ColourOptions[0], ColourOptions[1], "-jar", "server.jar", "nogui"}
+	if !added || !reflect.DeepEqual(got, want) {
+		t.Errorf("got %v (added %v), want %v", got, added, want)
+	}
+	if again, added := withColourOption(got); added || !reflect.DeepEqual(again, want) {
+		t.Errorf("adding twice changed the arguments: %v", again)
+	}
+	// A server that already has the first option gets only the second.
+	partial, added := withColourOption([]string{"-Dterminal.ansi=true", "-jar", "server.jar"})
+	if !added || !reflect.DeepEqual(partial, []string{"-Dterminal.ansi=true", ColourOptions[1], "-jar", "server.jar"}) {
+		t.Errorf("partial upgrade gave %v", partial)
+	}
+	if _, added := withColourOption([]string{"-version"}); added {
+		t.Error("a command with no -jar should be left alone")
+	}
+}
+
 func TestPlayerNames(t *testing.T) {
 	for _, name := range []string{"Notch", "brick_wren", ".BedrockUser", "a"} {
 		if !playerName.MatchString(name) {

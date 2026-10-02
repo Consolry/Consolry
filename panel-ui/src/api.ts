@@ -29,7 +29,8 @@ export type ServerInfo = {
   progress: string;
 };
 export type Activity = { id: number; at: number; user: string; text: string };
-export type Network = { port: number; addresses: string[]; listening: boolean };
+export type Forward = { port: number; externalIp: string; reachable: boolean };
+export type Network = { port: number; addresses: string[]; listening: boolean; forward: Forward | null };
 export type Startup = {
   command: string;
   args: string[];
@@ -168,6 +169,7 @@ export const api = {
     request<{ projects: Project[]; total: number; pageSize: number }>("GET", `/servers/${id}/plugins/search?q=${q(query)}&page=${page}`),
   activity: (id: string, limit: number) => request<Activity[]>("GET", `/servers/${id}/activity?limit=${limit}`),
   network: (id: string) => request<Network>("GET", `/servers/${id}/network`),
+  setForward: (id: string, enabled: boolean) => request<Forward | void>("POST", `/servers/${id}/network/forward`, { enabled }),
   startup: (id: string) => request<Startup>("GET", `/servers/${id}/startup`),
   installPlugin: (id: string, projectId: string) => request<{ installed: string[] }>("POST", `/servers/${id}/plugins/install`, { projectId }),
   updatePlugin: (id: string, file: string) => request<{ file: string }>("POST", `/servers/${id}/plugins/update`, { file }),

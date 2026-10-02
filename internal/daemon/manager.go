@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"sort"
 	"sync"
+	"time"
 )
 
 var validID = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,47}$`)
@@ -158,11 +159,40 @@ func (m *Manager) Remove(id string) error {
 	return m.saveLocked()
 }
 
+// shutdownGrace is how long a server gets to save and exit by itself before it is ended.
+const shutdownGrace = 45 * time.Second
+
 // Shutdown stops every running server so none is left behind when the daemon exits.
+// Each is asked to stop cleanly first, so worlds are saved; only one that does not
+// finish in time is ended by force.
 func (m *Manager) Shutdown() {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	servers := make([]*Server, 0, len(m.servers))
 	for _, s := range m.servers {
-		_ = s.Kill()
+		servers = append(servers, s)
 	}
+	m.mu.Unlock()
+
+	var wait sync.WaitGroup
+	for _, s := range servers {
+		if state := s.State(); state == StateOffline || state == StateCrashed {
+			continue
+		}
+		wait.Add(1)
+		go func(s *Server) {
+			defer wait.Done()
+			if s.Stop() != nil {
+				_ = s.Kill()
+			}
+			deadline := time.Now().Add(shutdownGrace)
+			for time.Now().Before(deadline) {
+				if state := s.State(); state == StateOffline || state == StateCrashed {
+					return
+				}
+				time.Sleep(200 * time.Millisecond)
+			}
+			_ = s.Kill()
+		}(s)
+	}
+	wait.Wait()
 }

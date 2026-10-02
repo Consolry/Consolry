@@ -123,5 +123,7 @@ func (a *App) handleNetwork(w http.ResponseWriter, r *http.Request) {
 	if network.Addresses == nil {
 		network.Addresses = []string{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"port": port, "addresses": network.Addresses, "listening": network.Listening})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"port": port, "addresses": network.Addresses, "listening": network.Listening, "forward": a.store.Forwarding(row.ID),
+	})
 }

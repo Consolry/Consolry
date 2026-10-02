@@ -57,6 +57,7 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("GET /api/servers/{id}/activity", a.authed(a.handleActivity))
 	mux.Handle("GET /api/servers/{id}/startup", a.authed(a.handleStartup))
 	mux.Handle("GET /api/servers/{id}/network", a.authed(a.handleNetwork))
+	mux.Handle("POST /api/servers/{id}/network/forward", a.authed(a.handleForward))
 	mux.Handle("GET /api/servers/{id}/players", a.authed(a.handlePlayers))
 	mux.Handle("POST /api/servers/{id}/players", a.authed(a.handlePlayerAction))
 	mux.Handle("GET /api/servers/{id}/schedules", a.authed(a.handleSchedules))
@@ -512,17 +513,29 @@ func (a *App) handlePower(w http.ResponseWriter, r *http.Request) {
 	}
 	// Minecraft servers made before the Java requirement was recorded get it filled in here,
 	// which is also what lets the daemon tell "starting" from "running".
+	// The same pass adds the option that makes Minecraft colour its console output.
 	if input.Action == "start" && row.Kind == "minecraft" {
-		if spec, err := serverState(r.Context(), node, row.ID); err == nil && spec.Java == 0 && spec.Command == "java" && spec.State != "running" {
-			spec.Java = minecraft.JavaFor(r.Context(), row.MCVersion)
-			spec.State, spec.StartedAt, spec.CPU, spec.Memory, spec.Progress = "", 0, 0, 0, ""
-			_ = node.call(r.Context(), http.MethodPut, "/servers/"+row.ID, spec, nil)
+		if spec, err := serverState(r.Context(), node, row.ID); err == nil && spec.Command == "java" && (spec.State == "offline" || spec.State == "crashed") {
+			changed := false
+			if spec.Java == 0 {
+				spec.Java, changed = minecraft.JavaFor(r.Context(), row.MCVersion), true
+			}
+			if args, added := withColourOption(spec.Args); added {
+				spec.Args, changed = args, true
+			}
+			if changed {
+				spec.State, spec.StartedAt, spec.CPU, spec.Memory, spec.Progress = "", 0, 0, 0, ""
+				_ = node.call(r.Context(), http.MethodPut, "/servers/"+row.ID, spec, nil)
+			}
 		}
 	}
 	var result map[string]string
 	if err := node.call(r.Context(), http.MethodPost, "/servers/"+row.ID+"/"+input.Action, nil, &result); err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return
+	}
+	if input.Action == "start" {
+		a.refreshForward(node, row)
 	}
 	a.log(r, row.ID, map[string]string{"start": "Started the server", "stop": "Stopped the server", "kill": "Killed the server"}[input.Action])
 	writeJSON(w, http.StatusOK, result)

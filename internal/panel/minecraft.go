@@ -76,6 +76,44 @@ type minecraftInput struct {
 // backups skip. IgnoreUnrecognizedVMOptions keeps older Java versions from refusing to start.
 var FastStartOptions = []string{"-XX:+IgnoreUnrecognizedVMOptions", "-XX:+AutoCreateSharedArchive", "-XX:SharedArchiveFile=cache/consolry.jsa"}
 
+// ColourOptions make Paper and its relatives keep colouring their output when it goes to a
+// panel instead of a terminal: the first turns colour on, the second lets messages such as the
+// answer to /plugins use their full colours.
+var ColourOptions = []string{"-Dterminal.ansi=true", "-Dnet.kyori.ansi.colorLevel=truecolor"}
+
+// withColourOption adds any missing ColourOptions to a Java command's arguments, before "-jar".
+func withColourOption(args []string) ([]string, bool) {
+	jar := -1
+	for i, arg := range args {
+		if arg == "-jar" {
+			jar = i
+			break
+		}
+	}
+	if jar < 0 {
+		return args, false
+	}
+	var missing []string
+	for _, option := range ColourOptions {
+		name := option[:strings.Index(option, "=")]
+		found := false
+		for _, arg := range args[:jar] {
+			if strings.HasPrefix(arg, name) {
+				found = true
+			}
+		}
+		if !found {
+			missing = append(missing, option)
+		}
+	}
+	if len(missing) == 0 {
+		return args, false
+	}
+	out := append([]string{}, args[:jar]...)
+	out = append(out, missing...)
+	return append(out, args[jar:]...), true
+}
+
 // minecraftSpec works out how to run a Minecraft server and what must be downloaded first.
 func minecraftSpec(ctx context.Context, id string, input minecraftInput) (daemonSpec, minecraft.Download, error) {
 	if _, ok := minecraft.FindSoftware(input.Software); !ok {
@@ -96,6 +134,7 @@ func minecraftSpec(ctx context.Context, id string, input minecraftInput) (daemon
 	if input.Software != "fabric" {
 		args = append(args, FastStartOptions...)
 	}
+	args = append(args, ColourOptions...)
 	spec := daemonSpec{
 		ID:          id,
 		Command:     "java",

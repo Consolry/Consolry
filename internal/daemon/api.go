@@ -153,6 +153,7 @@ func Handler(m *Manager, token, version string) http.Handler {
 	registerBackups(mux, m)
 	registerJava(mux, m)
 	registerNetwork(mux)
+	registerForwarding(mux)
 
 	return requireToken(token, mux)
 }

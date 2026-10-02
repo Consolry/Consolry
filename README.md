@@ -14,9 +14,12 @@ Consolry is for running game servers on your own Windows or Linux machine. You i
 - **Schedules.** Restart, back up or run a console command daily, weekly or every few hours.
 - **Automatic safety backups** before plugin changes and version switches, with old ones cleared out.
 - **Settings.** Rename, change memory, switch Minecraft version, and edit the common game settings in a form that shows what will change.
+- **Runs in the background.** On Windows it sits in the notification area with a menu to open the panel, start at sign-in, or quit. On Linux, `consolry -autostart on` sets it up as a service. Quitting saves and closes every server first.
+- **Port forwarding.** One button asks your router to open a server's port, and tells you if your internet provider makes that impossible.
+- **A coloured console** that keeps the server's own colours and marks each plugin green, yellow or red.
 - **Crash explainer.** Reads the last run's log and explains common failures in plain language, on your machine.
 
-Not built yet: two-factor login, extra users, notifications, automatic port forwarding, Hangar and CurseForge sources, off-site backups, containers on Linux, an installer, and config forms for individual plugins. See the [roadmap](https://www.consolry.com/roadmap).
+Not built yet: two-factor login, extra users, notifications, Hangar and CurseForge sources, off-site backups, containers on Linux, an installer, and config forms for individual plugins. See the [roadmap](https://www.consolry.com/roadmap).
 
 ## Layout
 

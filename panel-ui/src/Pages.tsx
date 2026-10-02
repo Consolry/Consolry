@@ -81,6 +81,7 @@ export function NetworkPage({ server }: { server: ServerInfo }) {
   }
 
   const suffix = network.port === 25565 ? "" : `:${network.port}`;
+  const forward = network.forward;
   const valid = /^\d+$/.test(port) && Number(port) >= 1024 && Number(port) <= 65535;
 
   function savePort(event: FormEvent) {
@@ -120,20 +121,56 @@ export function NetworkPage({ server }: { server: ServerInfo }) {
 
       <div className="card form wide">
         <h2>Letting friends outside your home join</h2>
-        <ol className="plain-steps">
-          <li>
-            In your router's settings, forward TCP port <strong>{network.port}</strong> to{" "}
-            <strong>{network.addresses[0] ?? "this machine's address"}</strong>.
-          </li>
-          <li>Find your public address by searching "what is my IP" on this machine.</li>
-          <li>
-            Friends join with that address{suffix && <>, followed by <strong>{suffix}</strong></>}.
-          </li>
-        </ol>
-        <p className="dim">
-          Consolry does not forward ports for you yet. Some internet providers share one address between many customers, in which case forwarding cannot work
-          and you would need a tunnel service instead. Turn on the whitelist in Players before sharing your address.
-        </p>
+        {forward ? (
+          <>
+            {forward.reachable ? (
+              <>
+                <p>Port {forward.port} is open on your router. Friends anywhere can join with:</p>
+                <p className="join-address">
+                  {forward.externalIp}
+                  {forward.port === 25565 ? "" : `:${forward.port}`}
+                </p>
+                <p className="dim">
+                  That is your home's public address, so share it only with people you trust, and turn on the whitelist in Players. Consolry reopens the
+                  port each time the server starts.
+                </p>
+              </>
+            ) : (
+              <p className="note warn">
+                Your router opened port {forward.port}, but its own address ({forward.externalIp || "unknown"}) is not a public one. Your internet provider
+                shares one address between customers, so people outside still cannot connect. You would need a tunnel service instead.
+              </p>
+            )}
+            {forward.port !== network.port && (
+              <p className="note warn">
+                The server now uses port {network.port}, but port {forward.port} is the one open. Press "Open the new port" to fix that.
+              </p>
+            )}
+            <div className="bar">
+              {forward.port !== network.port && (
+                <button className="primary" disabled={busy !== ""} onClick={() => run("forward", () => api.setForward(server.id, true), load)}>
+                  Open the new port
+                </button>
+              )}
+              <button disabled={busy !== ""} onClick={() => run("forward", () => api.setForward(server.id, false), load)}>
+                {busy === "forward" ? "Working…" : "Close the port"}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p>
+              Consolry can ask your router to open port <strong>{network.port}</strong> for this server, so you don't have to change router settings by hand.
+            </p>
+            <button className="primary" disabled={busy !== ""} onClick={() => run("forward", () => api.setForward(server.id, true), load)}>
+              {busy === "forward" ? "Asking your router…" : "Open the port for me"}
+            </button>
+            <p className="dim">
+              This uses UPnP, which most home routers have switched on. If yours refuses, forward TCP port {network.port} to{" "}
+              {network.addresses[0] ?? "this machine"} in the router's settings yourself.
+            </p>
+          </>
+        )}
       </div>
 
       <form className="card form" onSubmit={savePort}>

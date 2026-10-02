@@ -195,13 +195,26 @@ func (s *Server) watch(cmd *exec.Cmd, r *os.File) {
 	s.appendLocked(fmt.Sprintf("[consolry] Server stopped (exit code %d)", code))
 }
 
-// colourCodes matches the terminal escape sequences servers use to colour their output.
-var colourCodes = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)
+// colourCodes matches the escape sequences servers use to colour their output. They are kept,
+// so the console can show the server's own colours.
+var colourCodes = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+// otherCodes matches every other terminal escape: cursor movement, line clearing, window titles.
+// Those mean nothing in a log and would show as stray characters.
+var otherCodes = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-ln-z]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[=>]`)
+
+// Plain returns a console line without its colour codes, for searching and pattern matching.
+func Plain(line string) string {
+	if !strings.Contains(line, "\x1b") {
+		return line
+	}
+	return colourCodes.ReplaceAllString(line, "")
+}
 
 // cleanLine prepares one line of server output for the console: no trailing carriage
-// return, no colour codes, and always valid UTF-8.
+// return, no terminal codes other than colours, and always valid UTF-8.
 func cleanLine(line string) string {
-	line = colourCodes.ReplaceAllString(strings.TrimRight(line, "\r"), "")
+	line = otherCodes.ReplaceAllString(strings.TrimRight(line, "\r"), "")
 	if utf8.ValidString(line) {
 		return line
 	}
@@ -290,9 +303,10 @@ func (s *Server) append(line string) {
 
 func (s *Server) appendLocked(line string) {
 	if !s.ready && s.cmd != nil && !strings.HasPrefix(line, "[consolry]") {
-		if minecraftReady.MatchString(line) {
+		plain := Plain(line)
+		if minecraftReady.MatchString(plain) {
 			s.ready = true
-		} else if text := strings.TrimSpace(logPrefix.ReplaceAllString(line, "")); text != "" && !strings.HasPrefix(text, "WARNING:") && !strings.HasPrefix(text, "- ") {
+		} else if text := strings.TrimSpace(logPrefix.ReplaceAllString(plain, "")); text != "" && !strings.HasPrefix(text, "WARNING:") && !strings.HasPrefix(text, "- ") {
 			if len(text) > 90 {
 				text = text[:90]
 			}

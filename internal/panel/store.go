@@ -100,6 +100,7 @@ func OpenStore(path string) (*Store, error) {
 		"kind TEXT NOT NULL DEFAULT 'generic'",
 		"software TEXT NOT NULL DEFAULT ''",
 		"mc_version TEXT NOT NULL DEFAULT ''",
+		"forward TEXT NOT NULL DEFAULT ''",
 	} {
 		if _, err := db.Exec("ALTER TABLE servers ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			db.Close()

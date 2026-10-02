@@ -60,11 +60,16 @@ func waitState(t *testing.T, s *Server, want State) {
 	t.Fatalf("state is %q, want %q", s.State(), want)
 }
 
-func TestCleanLine(t *testing.T) {
-	got := cleanLine("[04:40:16 INFO]: \x1b[38;5;3mThere are \x1b[38;5;9m0\x1b[38;5;3m out of maximum \x1b[38;5;9m20\x1b[38;5;3m players online.\x1b[0m\r")
-	want := "[04:40:16 INFO]: There are 0 out of maximum 20 players online."
+func TestCleanLineKeepsColoursOnly(t *testing.T) {
+	// Colour codes stay; cursor movement, line clearing and the trailing carriage return go.
+	raw := "[K[04:40:16 INFO]: [38;5;3mThere are [91m0[0m players online.[2J"
+	got := cleanLine(raw)
+	want := "[04:40:16 INFO]: [38;5;3mThere are [91m0[0m players online."
 	if got != want {
-		t.Errorf("got %q, want %q", got, want)
+		t.Errorf("cleanLine = %q, want %q", got, want)
+	}
+	if plain := Plain(got); plain != "[04:40:16 INFO]: There are 0 players online." {
+		t.Errorf("Plain = %q", plain)
 	}
 }
 
@@ -184,7 +189,8 @@ func TestStartingUntilReady(t *testing.T) {
 		t.Errorf("progress is %q, want the newest output line", got)
 	}
 
-	_ = s.Send("Done (1.234s)! For help, type \"help\"")
+	// The ready line is recognised even when the server colours it.
+	_ = s.Send("[32mDone (1.234s)! For help, type \"help\"[0m")
 	waitState(t, s, StateRunning)
 	if got := s.Progress(); got != "" {
 		t.Errorf("progress should be empty once running, got %q", got)
@@ -195,4 +201,24 @@ func TestStartingUntilReady(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitState(t, s, StateOffline)
+}
+
+func TestShutdownStopsServersCleanly(t *testing.T) {
+	m, _ := NewManager(t.TempDir())
+	_ = m.Create(echoSpec("closing"))
+	s, _ := m.Get("closing")
+	_, lines, cancel := s.Subscribe()
+	defer cancel()
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+	waitLine(t, lines, "ready")
+
+	m.Shutdown()
+
+	// "bye" is what the test server prints when it is asked to stop, rather than being killed.
+	waitLine(t, lines, "bye")
+	if got := s.State(); got != StateOffline {
+		t.Errorf("state after shutdown is %q, want offline", got)
+	}
 }

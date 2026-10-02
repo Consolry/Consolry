@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { consoleSocket } from "./api";
-import { colourLine, pluginHealth } from "./colour";
+import { colourLine, parseLine, pluginHealth } from "./colour";
 
 const maxLines = 2000;
 
@@ -118,15 +118,16 @@ export default function Console({ serverId, running }: { serverId: string; runni
   // Colour every line. A line with no timestamp (a stack trace) takes the level of the line above it,
   // so the levels are worked out over the whole log before any search filter is applied.
   const rendered = useMemo(() => {
-    const health = pluginHealth(lines);
+    const parsed = lines.map(parseLine);
+    const health = pluginHealth(parsed.map((line) => line.plain));
     let level: ReturnType<typeof colourLine>["level"] = "";
     let list = false;
     const out: { text: string; node: ReactNode }[] = [];
-    for (const text of lines) {
-      const result = colourLine(text, health, level, list);
+    for (const line of parsed) {
+      const result = colourLine(line, health, level, list);
       level = result.level;
       list = result.list;
-      out.push({ text, node: result.node });
+      out.push({ text: line.plain, node: result.node });
     }
     return out;
   }, [lines]);

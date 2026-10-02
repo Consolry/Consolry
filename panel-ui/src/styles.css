@@ -1741,3 +1741,13 @@ pre.command {
   color: #ffffff;
   font-weight: 600;
 }
+
+.join-address {
+  padding: 10px 14px;
+  background: #050b15;
+  box-shadow: var(--pixel-box);
+  color: var(--ok);
+  font-family: var(--mono);
+  font-size: 1.3rem;
+  user-select: all;
+}

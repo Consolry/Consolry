@@ -364,6 +364,10 @@ func registerFiles(mux *http.ServeMux, m *Manager) {
 		}
 		history, _, cancel := s.Subscribe()
 		cancel()
+		// The panel reads this to match patterns, so the colour codes are taken out.
+		for i, line := range history {
+			history[i] = Plain(line)
+		}
 		writeJSON(w, http.StatusOK, history)
 	})
 }
