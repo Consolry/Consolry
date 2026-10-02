@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://consolry.gg/sitemap.xml
+Sitemap: https://consolry.com/sitemap.xml

@@ -1,60 +1,36 @@
 import { useId, useState, type FormEvent } from "react";
+import { site } from "../content";
 
-const endpoint = import.meta.env.VITE_WAITLIST_URL as string | undefined;
-
-type Status = "idle" | "sending" | "done" | "error" | "closed";
+// Buttondown's standard sign-up form. Submitting opens Buttondown's own confirmation
+// page in a new tab, which also handles the "check your inbox" step.
+const action = site.buttondownUsername
+  ? `https://buttondown.com/api/emails/embed-subscribe/${site.buttondownUsername}`
+  : undefined;
 
 export default function Waitlist() {
   const inputId = useId();
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<Status>("idle");
+  const [status, setStatus] = useState<"idle" | "sent" | "closed">("idle");
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
-    if (!endpoint) {
+  function submit(event: FormEvent) {
+    if (!action) {
+      event.preventDefault();
       setStatus("closed");
       return;
     }
-    setStatus("sending");
-    try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      setStatus(response.ok ? "done" : "error");
-    } catch {
-      setStatus("error");
-    }
-  }
-
-  if (status === "done") {
-    return (
-      <p className="waitlist-done" role="status">
-        You're on the list. We'll email {email} when the first release is ready.
-      </p>
-    );
+    setStatus("sent");
   }
 
   return (
-    <form className="waitlist" onSubmit={submit}>
+    <form className="waitlist" action={action} method="post" target="_blank" onSubmit={submit}>
       <label htmlFor={inputId}>Email address</label>
       <div className="waitlist-row">
-        <input
-          id={inputId}
-          type="email"
-          required
-          autoComplete="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
-        <button type="submit" className="button" disabled={status === "sending"}>
-          {status === "sending" ? "Joining…" : "Join the waitlist"}
+        <input id={inputId} type="email" name="email" required autoComplete="email" placeholder="you@example.com" />
+        <button type="submit" className="button">
+          Join the waitlist
         </button>
       </div>
       <p className="waitlist-note" role="status">
-        {status === "error" && "That didn't go through. Check your connection and try again."}
+        {status === "sent" && "Almost done. Confirm in the tab that just opened, then check your inbox."}
         {status === "closed" && "The waitlist isn't open yet. Check back soon."}
       </p>
     </form>

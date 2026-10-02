@@ -1,6 +1,8 @@
 export const site = {
-  url: "https://consolry.gg",
+  url: "https://consolry.com",
   name: "Consolry",
+  // The Buttondown account name, from buttondown.com/<name>. Empty means the waitlist is closed.
+  buttondownUsername: "",
 };
 
 export const routes = [

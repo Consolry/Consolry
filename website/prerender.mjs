@@ -15,7 +15,7 @@ if (!template.includes("<!--app-->")) {
 const escape = (text) => text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
 for (const route of routes) {
-  const url = site.url + (route.path === "/" ? "/" : `${route.path}/`);
+  const url = site.url + route.path;
   const html = template
     .replace("<!--app-->", render(route.path))
     .replace(/<title>.*?<\/title>/s, `<title>${escape(route.title)}</title>`)
@@ -30,9 +30,17 @@ for (const route of routes) {
   writeFileSync(resolve(dir, "index.html"), html);
 }
 
+// Vercel serves this file for any address that does not exist.
+writeFileSync(
+  "dist/404.html",
+  template
+    .replace("<!--app-->", render("/404"))
+    .replace(/<title>.*?<\/title>/s, "<title>Page not found | Consolry</title>"),
+);
+
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${routes.map((route) => `  <url><loc>${site.url}${route.path === "/" ? "/" : `${route.path}/`}</loc></url>`).join("\n")}
+${routes.map((route) => `  <url><loc>${site.url}${route.path}</loc></url>`).join("\n")}
 </urlset>
 `;
 writeFileSync("dist/sitemap.xml", sitemap);
