@@ -4,3 +4,14 @@ dist/
 .env.local
 *.log
 dist-ssr/
+
+# Go builds and local runtime data
+/bin/
+*.db
+*.db-shm
+*.db-wal
+daemon-data/
+
+# The panel interface is built into this folder; only the placeholder is tracked
+internal/panel/web/dist/*
+!internal/panel/web/dist/.gitkeep

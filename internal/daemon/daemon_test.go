@@ -1,0 +1,141 @@
+package daemon
+
+import (
+	"os"
+	"testing"
+	"time"
+
+	"github.com/DinoNaedYT/Consolry/internal/testhelper"
+)
+
+func TestMain(m *testing.M) {
+	testhelper.RunEchoIfRequested()
+	os.Exit(m.Run())
+}
+
+func echoSpec(id string) Spec {
+	return Spec{ID: id, Command: os.Args[0], Args: []string{testhelper.EchoArg}, StopCommand: "stop"}
+}
+
+func waitLine(t *testing.T, lines chan string, want string) {
+	t.Helper()
+	deadline := time.After(10 * time.Second)
+	for {
+		select {
+		case line := <-lines:
+			if line == want {
+				return
+			}
+		case <-deadline:
+			t.Fatalf("timed out waiting for console line %q", want)
+		}
+	}
+}
+
+func waitState(t *testing.T, s *Server, want State) {
+	t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if s.State() == want {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("state is %q, want %q", s.State(), want)
+}
+
+func TestServerLifecycle(t *testing.T) {
+	m, err := NewManager(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Create(echoSpec("lifecycle")); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := m.Get("lifecycle")
+	_, lines, cancel := s.Subscribe()
+	defer cancel()
+
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+	waitLine(t, lines, "ready")
+	if err := s.Start(); err == nil {
+		t.Error("starting a running server should fail")
+	}
+
+	if err := s.Send("hello"); err != nil {
+		t.Fatal(err)
+	}
+	waitLine(t, lines, "echo: hello")
+
+	if err := s.Stop(); err != nil {
+		t.Fatal(err)
+	}
+	waitLine(t, lines, "bye")
+	waitState(t, s, StateOffline)
+
+	history, _, cancelHistory := s.Subscribe()
+	cancelHistory()
+	if len(history) < 4 {
+		t.Errorf("history has %d lines, want the full session", len(history))
+	}
+}
+
+func TestCrashIsReported(t *testing.T) {
+	m, _ := NewManager(t.TempDir())
+	_ = m.Create(echoSpec("crasher"))
+	s, _ := m.Get("crasher")
+	_, lines, cancel := s.Subscribe()
+	defer cancel()
+
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+	waitLine(t, lines, "ready")
+	_ = s.Send("crash")
+	waitState(t, s, StateCrashed)
+}
+
+func TestKill(t *testing.T) {
+	m, _ := NewManager(t.TempDir())
+	_ = m.Create(echoSpec("killme"))
+	s, _ := m.Get("killme")
+	_, lines, cancel := s.Subscribe()
+	defer cancel()
+
+	if err := s.Start(); err != nil {
+		t.Fatal(err)
+	}
+	waitLine(t, lines, "ready")
+	if err := s.Kill(); err != nil {
+		t.Fatal(err)
+	}
+	waitState(t, s, StateOffline)
+}
+
+func TestRegistrySurvivesRestart(t *testing.T) {
+	dir := t.TempDir()
+	m, _ := NewManager(dir)
+	if err := m.Create(echoSpec("kept")); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.Create(Spec{ID: "Bad ID", Command: "x"}); err == nil {
+		t.Error("an invalid id should be rejected")
+	}
+
+	reopened, err := NewManager(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	list := reopened.List()
+	if len(list) != 1 || list[0].ID != "kept" || list[0].State != StateOffline {
+		t.Fatalf("unexpected registry after restart: %+v", list)
+	}
+	if err := reopened.Remove("kept"); err != nil {
+		t.Fatal(err)
+	}
+	if len(reopened.List()) != 0 {
+		t.Error("server should be gone after Remove")
+	}
+}
