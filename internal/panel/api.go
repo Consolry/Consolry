@@ -33,6 +33,7 @@ const userKey contextKey = 0
 type App struct {
 	store   *Store
 	version string
+	remote  remoteAccess
 }
 
 func New(store *Store, version string) *App { return &App{store: store, version: version} }
@@ -43,39 +44,48 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("GET /api/state", a.handleState)
 	mux.HandleFunc("POST /api/setup", a.handleSetup)
 	mux.HandleFunc("POST /api/login", a.handleLogin)
+	mux.HandleFunc("POST /api/signup", a.handleSignup)
 	mux.HandleFunc("POST /api/logout", a.handleLogout)
 
-	mux.Handle("GET /api/nodes", a.authed(a.handleNodes))
-	mux.Handle("POST /api/nodes", a.authed(a.handleCreateNode))
-	mux.Handle("DELETE /api/nodes/{id}", a.authed(a.handleDeleteNode))
+	mux.Handle("GET /api/nodes", a.admin(a.handleNodes))
+	mux.Handle("POST /api/nodes", a.admin(a.handleCreateNode))
+	mux.Handle("DELETE /api/nodes/{id}", a.admin(a.handleDeleteNode))
 
 	mux.Handle("GET /api/servers", a.authed(a.handleServers))
-	mux.Handle("POST /api/servers", a.authed(a.handleCreateServer))
-	mux.Handle("DELETE /api/servers/{id}", a.authed(a.handleDeleteServer))
-	mux.Handle("PATCH /api/servers/{id}", a.authed(a.handleUpdateServer))
-	mux.Handle("POST /api/servers/{id}/minecraft/version", a.authed(a.handleSwitchVersion))
-	mux.Handle("GET /api/servers/{id}/activity", a.authed(a.handleActivity))
-	mux.Handle("GET /api/servers/{id}/startup", a.authed(a.handleStartup))
-	mux.Handle("GET /api/servers/{id}/network", a.authed(a.handleNetwork))
-	mux.Handle("POST /api/servers/{id}/network/forward", a.authed(a.handleForward))
-	mux.Handle("GET /api/servers/{id}/players", a.authed(a.handlePlayers))
-	mux.Handle("POST /api/servers/{id}/players", a.authed(a.handlePlayerAction))
-	mux.Handle("GET /api/servers/{id}/schedules", a.authed(a.handleSchedules))
-	mux.Handle("POST /api/servers/{id}/schedules", a.authed(a.handleCreateSchedule))
-	mux.Handle("PATCH /api/schedules/{sid}", a.authed(a.handleUpdateSchedule))
-	mux.Handle("DELETE /api/schedules/{sid}", a.authed(a.handleDeleteSchedule))
-	mux.Handle("POST /api/schedules/{sid}/run", a.authed(a.handleRunSchedule))
-	mux.Handle("POST /api/servers/{id}/power", a.authed(a.handlePower))
-	mux.Handle("GET /api/servers/{id}/console", a.authed(a.handleConsole))
-	mux.Handle("GET /api/servers/{id}/diagnosis", a.authed(a.handleDiagnosis))
+	mux.Handle("POST /api/servers", a.admin(a.handleCreateServer))
+	mux.Handle("DELETE /api/servers/{id}", a.onServer("owner", a.handleDeleteServer))
+	mux.Handle("PATCH /api/servers/{id}", a.onServer("settings", a.handleUpdateServer))
+	mux.Handle("POST /api/servers/{id}/minecraft/version", a.onServer("settings", a.handleSwitchVersion))
+	mux.Handle("GET /api/servers/{id}/activity", a.onServer("activity", a.handleActivity))
+	mux.Handle("GET /api/servers/{id}/startup", a.onServer("settings", a.handleStartup))
+	mux.Handle("GET /api/servers/{id}/network", a.onServer("network", a.handleNetwork))
+	mux.Handle("POST /api/servers/{id}/network/forward", a.onServer("network", a.handleForward))
+	mux.Handle("GET /api/servers/{id}/players", a.onServer("players", a.handlePlayers))
+	mux.Handle("POST /api/servers/{id}/players", a.onServer("players", a.handlePlayerAction))
+	mux.Handle("GET /api/servers/{id}/schedules", a.onServer("schedules", a.handleSchedules))
+	mux.Handle("POST /api/servers/{id}/schedules", a.onServer("schedules", a.handleCreateSchedule))
+	mux.Handle("PATCH /api/schedules/{sid}", a.onSchedule(a.handleUpdateSchedule))
+	mux.Handle("DELETE /api/schedules/{sid}", a.onSchedule(a.handleDeleteSchedule))
+	mux.Handle("POST /api/schedules/{sid}/run", a.onSchedule(a.handleRunSchedule))
+	mux.Handle("POST /api/servers/{id}/power", a.onServer("power", a.handlePower))
+	mux.Handle("GET /api/servers/{id}/console", a.onServer("console", a.handleConsole))
+	mux.Handle("GET /api/servers/{id}/diagnosis", a.onServer("console", a.handleDiagnosis))
 	mux.Handle("/api/servers/{id}/node/{rest...}", a.authed(a.handleNodeProxy))
+
+	mux.Handle("GET /api/servers/{id}/users", a.onServer(ownerOnly, a.handleMembers))
+	mux.Handle("POST /api/servers/{id}/users", a.onServer(ownerOnly, a.handleInvite))
+	mux.Handle("PATCH /api/servers/{id}/users/{uid}", a.onServer(ownerOnly, a.handleUpdateMember))
+	mux.Handle("DELETE /api/servers/{id}/users/{uid}", a.onServer(ownerOnly, a.handleRemoveMember))
+
+	mux.Handle("GET /api/panel", a.admin(a.handlePanelSettings))
+	mux.Handle("POST /api/panel", a.admin(a.handleUpdatePanelSettings))
 
 	mux.Handle("GET /api/minecraft/software", a.authed(a.handleMinecraftSoftware))
 	mux.Handle("GET /api/minecraft/versions", a.authed(a.handleMinecraftVersions))
-	mux.Handle("GET /api/servers/{id}/plugins", a.authed(a.handlePlugins))
-	mux.Handle("GET /api/servers/{id}/plugins/search", a.authed(a.handlePluginSearch))
-	mux.Handle("POST /api/servers/{id}/plugins/install", a.authed(a.handlePluginInstall))
-	mux.Handle("POST /api/servers/{id}/plugins/update", a.authed(a.handlePluginUpdate))
+	mux.Handle("GET /api/servers/{id}/plugins", a.onServer("plugins", a.handlePlugins))
+	mux.Handle("GET /api/servers/{id}/plugins/search", a.onServer("plugins", a.handlePluginSearch))
+	mux.Handle("POST /api/servers/{id}/plugins/install", a.onServer("plugins", a.handlePluginInstall))
+	mux.Handle("POST /api/servers/{id}/plugins/update", a.onServer("plugins", a.handlePluginUpdate))
 
 	mux.Handle("/api/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
@@ -164,7 +174,7 @@ func (a *App) handleState(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	state := map[string]any{"setupNeeded": !hasUsers, "version": a.version, "user": nil}
+	state := map[string]any{"setupNeeded": !hasUsers, "version": a.version, "user": nil, "signupAllowed": hasUsers && a.signupAllowed()}
 	if user, ok := a.currentUser(r); ok {
 		state["user"] = user
 	}
@@ -177,6 +187,11 @@ var setupLock sync.Mutex
 func (a *App) handleSetup(w http.ResponseWriter, r *http.Request) {
 	var input credentials
 	if !readJSON(w, r, &input) {
+		return
+	}
+	// The first account owns the panel, so it can only be made on the machine the panel runs on.
+	if !fromThisMachine(r) {
+		writeError(w, http.StatusForbidden, "this panel has not been set up yet. Open it on the machine it is installed on to create the admin account")
 		return
 	}
 	setupLock.Lock()
@@ -216,8 +231,14 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if !readJSON(w, r, &input) {
 		return
 	}
+	from := clientAddress(r)
+	if !logins.allow(from) {
+		writeError(w, http.StatusTooManyRequests, "too many wrong passwords. Wait 15 minutes and try again")
+		return
+	}
 	user, err := a.store.CheckPassword(input.Username, input.Password)
 	if errors.Is(err, errBadLogin) {
+		logins.fail(from)
 		writeError(w, http.StatusUnauthorized, err.Error())
 		return
 	}
@@ -225,6 +246,7 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	logins.clear(from)
 	if err := a.startSession(w, r, user); err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -332,6 +354,10 @@ type serverView struct {
 	Memory      uint64   `json:"memory"`
 	MemoryLimit int      `json:"memoryLimitMb"`
 	Progress    string   `json:"progress"`
+	// Owner is true for the server's owner and for admins, who can do everything including sharing it.
+	Owner bool `json:"owner"`
+	// Permissions lists what the signed-in user may do on this server.
+	Permissions []string `json:"permissions"`
 }
 
 func (a *App) handleServers(w http.ResponseWriter, r *http.Request) {
@@ -359,9 +385,16 @@ func (a *App) handleServers(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	views := make([]serverView, len(rows))
-	for i, row := range rows {
+	// Only the servers that are this user's, or have been shared with them.
+	user, _ := r.Context().Value(userKey).(User)
+	views := []serverView{}
+	for _, row := range rows {
+		granted, shared := a.store.accessTo(user, row)
+		if !shared {
+			continue
+		}
 		view := serverView{
+			Owner: granted.owner, Permissions: granted.list(),
 			ID: row.ID, Name: row.Name, NodeID: row.NodeID, NodeName: names[row.NodeID], State: "unreachable", Args: []string{},
 			Kind: row.Kind, Software: row.Software, MCVersion: row.MCVersion,
 		}
@@ -372,7 +405,7 @@ func (a *App) handleServers(w http.ResponseWriter, r *http.Request) {
 			}
 			view.CPU, view.Memory, view.MemoryLimit, view.Progress = spec.CPU, spec.Memory, memoryOf(spec.Args), spec.Progress
 		}
-		views[i] = view
+		views = append(views, view)
 	}
 	writeJSON(w, http.StatusOK, views)
 }
@@ -421,7 +454,8 @@ func (a *App) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	row := ServerRow{ID: id, Name: input.Name, NodeID: node.ID}
+	creator, _ := r.Context().Value(userKey).(User)
+	row := ServerRow{ID: id, Name: input.Name, NodeID: node.ID, OwnerID: creator.ID}
 	var spec daemonSpec
 	var download minecraft.Download
 	if input.Minecraft != nil {

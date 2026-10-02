@@ -1,5 +1,25 @@
-export type User = { id: number; username: string };
-export type PanelState = { setupNeeded: boolean; version: string; user: User | null };
+export type User = { id: number; username: string; admin: boolean };
+export type PanelState = { setupNeeded: boolean; version: string; user: User | null; signupAllowed: boolean };
+export type Permission = "console" | "power" | "files" | "plugins" | "players" | "settings" | "backups" | "schedules" | "network" | "activity";
+/** What a server's owner can let an invited person do, in the order it is offered. */
+export const permissionList: { id: Permission; label: string; about: string; minecraftOnly?: boolean }[] = [
+  { id: "console", label: "Console", about: "Read the console and type commands." },
+  { id: "power", label: "Start and stop", about: "Start, stop and kill the server." },
+  { id: "files", label: "Files", about: "Open, change, upload and delete the server's files." },
+  { id: "plugins", label: "Plugins and mods", about: "Install and update them.", minecraftOnly: true },
+  { id: "players", label: "Players", about: "Kick, ban, whitelist and make operators.", minecraftOnly: true },
+  { id: "settings", label: "Settings", about: "Game settings, version, memory and start-up options." },
+  { id: "backups", label: "Backups", about: "Make, download, restore and delete backups." },
+  { id: "schedules", label: "Schedules", about: "Add, change and run scheduled tasks." },
+  { id: "network", label: "Network", about: "See the address and open or close the port." },
+  { id: "activity", label: "Activity", about: "See who did what on the server." },
+];
+export type Member = { userId: number; username: string; permissions: Permission[] };
+export type RemoteMode = "off" | "network" | "internet";
+export type PanelSettings = {
+  signup: boolean;
+  remote: { mode: RemoteMode; port: number; networkAddress: string; internetAddress: string; problem: string };
+};
 export type NodeInfo = { id: number; name: string; url: string; online: boolean; os?: string; version?: string };
 export type ServerState = "offline" | "starting" | "running" | "stopping" | "crashed" | "unreachable";
 
@@ -27,6 +47,10 @@ export type ServerInfo = {
   memoryLimitMb: number;
   /** The server's newest output line while it is starting. */
   progress: string;
+  /** True for the server's owner and for admins. */
+  owner: boolean;
+  /** What the signed-in user may do on this server. */
+  permissions: Permission[];
 };
 export type Activity = { id: number; at: number; user: string; text: string };
 export type Forward = { port: number; externalIp: string; reachable: boolean };
@@ -116,7 +140,17 @@ export const api = {
   state: () => request<PanelState>("GET", "/state"),
   setup: (username: string, password: string) => request<User>("POST", "/setup", { username, password }),
   login: (username: string, password: string) => request<User>("POST", "/login", { username, password }),
+  signup: (username: string, password: string) => request<User>("POST", "/signup", { username, password }),
   logout: () => request<void>("POST", "/logout", {}),
+
+  panelSettings: () => request<PanelSettings>("GET", "/panel"),
+  updatePanelSettings: (patch: { signup?: boolean; remote?: RemoteMode }) => request<PanelSettings>("POST", "/panel", patch),
+
+  members: (id: string) => request<Member[]>("GET", `/servers/${id}/users`),
+  invite: (id: string, username: string, permissions: Permission[]) => request<Member>("POST", `/servers/${id}/users`, { username, permissions }),
+  setMemberPermissions: (id: string, userId: number, permissions: Permission[]) =>
+    request<void>("PATCH", `/servers/${id}/users/${userId}`, { permissions }),
+  removeMember: (id: string, userId: number) => request<void>("DELETE", `/servers/${id}/users/${userId}`),
 
   nodes: () => request<NodeInfo[]>("GET", "/nodes"),
   createNode: (name: string, url: string, token: string) => request<NodeInfo>("POST", "/nodes", { name, url, token }),

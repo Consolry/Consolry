@@ -49,13 +49,16 @@ func allowedPass(rest string) bool {
 
 // handleNodeProxy forwards file and backup requests for one server to its node, streaming both ways.
 func (a *App) handleNodeProxy(w http.ResponseWriter, r *http.Request) {
-	row, node, ok := a.serverNode(w, r)
-	if !ok {
-		return
-	}
 	rest := r.PathValue("rest")
 	if !allowedPass(rest) {
 		writeError(w, http.StatusNotFound, "not found")
+		return
+	}
+	if !a.mayUse(w, r, r.PathValue("id"), passPermission(rest)) {
+		return
+	}
+	row, node, ok := a.serverNode(w, r)
+	if !ok {
 		return
 	}
 	path := "/servers/" + row.ID + "/" + rest

@@ -16,6 +16,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -81,7 +82,13 @@ func main() {
 
 	app := panel.New(store, version.Version)
 	app.StartScheduler(ctx)
-	server := &http.Server{Handler: app.Handler(), ReadHeaderTimeout: 10 * time.Second}
+	handler := app.Handler()
+	server := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
+	if host, port, err := net.SplitHostPort(*listen); err == nil {
+		if number, err := strconv.Atoi(port); err == nil {
+			app.StartRemote(ctx, handler, host, number)
+		}
+	}
 	go func() {
 		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Print(err)

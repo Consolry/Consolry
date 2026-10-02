@@ -11,7 +11,7 @@ export default function Settings({ server, onChanged, onDeleted }: Props) {
       {live && <p className="note">Some settings can only be changed while the server is stopped.</p>}
       <General server={server} live={live} onChanged={onChanged} />
       {server.kind === "minecraft" && <VersionSwitch server={server} live={live} onChanged={onChanged} />}
-      <Remove server={server} live={live} onDeleted={onDeleted} />
+      {server.owner && <Remove server={server} live={live} onDeleted={onDeleted} />}
     </section>
   );
 }

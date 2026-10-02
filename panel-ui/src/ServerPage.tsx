@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, isLive, stateLabel, uptime, type Finding, type PowerAction, type ServerInfo } from "./api";
+import { api, isLive, stateLabel, uptime, type Finding, type Permission, type PowerAction, type ServerInfo } from "./api";
 import Backups from "./Backups";
 import Console from "./Console";
 import Dashboard, { type UsageHistory } from "./Dashboard";
@@ -10,6 +10,7 @@ import Plugins from "./Plugins";
 import Schedules from "./Schedules";
 import Settings, { GameSettings } from "./Settings";
 import { ErrorNote, useAction } from "./ui";
+import Users from "./Users";
 
 export type Tab =
   | "dashboard"
@@ -23,6 +24,7 @@ export type Tab =
   | "network"
   | "schedules"
   | "startup"
+  | "users"
   | "settings";
 
 type Props = { server: ServerInfo; tab: Tab; now: number; history?: UsageHistory; onChanged: () => void; onDeleted: () => void };
@@ -35,24 +37,29 @@ export default function ServerPage({ server, tab, now, history, onChanged, onDel
   const minecraft = server.kind === "minecraft";
   const power = (action: PowerAction) => run(action, () => api.power(server.id, action), onChanged);
 
-  const tabs: { id: Tab; label: string }[] = [
+  const can = (permission: Permission) => server.permissions.includes(permission);
+
+  // `needs` is the permission a tab takes; tabs without one are for everyone the server is shared with.
+  const all: { id: Tab; label: string; needs?: Permission; owner?: boolean }[] = [
     { id: "dashboard", label: "Dashboard" },
-    { id: "console", label: "Console" },
-    { id: "files", label: "Files" },
+    { id: "console", label: "Console", needs: "console" },
+    { id: "files", label: "Files", needs: "files" },
     ...(minecraft
       ? [
-          { id: "plugins" as Tab, label: server.software === "fabric" ? "Mods" : "Plugins" },
-          { id: "players" as Tab, label: "Players" },
-          { id: "game" as Tab, label: "Game settings" },
+          { id: "plugins" as Tab, label: server.software === "fabric" ? "Mods" : "Plugins", needs: "plugins" as Permission },
+          { id: "players" as Tab, label: "Players", needs: "players" as Permission },
+          { id: "game" as Tab, label: "Game settings", needs: "settings" as Permission },
         ]
       : []),
-    { id: "backups", label: "Backups" },
-    { id: "schedules", label: "Schedules" },
-    { id: "network", label: "Network" },
-    { id: "startup", label: "Startup" },
-    { id: "activity", label: "Activity" },
-    { id: "settings", label: "Settings" },
+    { id: "backups", label: "Backups", needs: "backups" },
+    { id: "schedules", label: "Schedules", needs: "schedules" },
+    { id: "network", label: "Network", needs: "network" },
+    { id: "startup", label: "Startup", needs: "settings" },
+    { id: "activity", label: "Activity", needs: "activity" },
+    { id: "users", label: "Users", owner: true },
+    { id: "settings", label: "Settings", needs: "settings" },
   ];
+  const tabs = all.filter((item) => (item.owner ? server.owner : !item.needs || can(item.needs)));
   const current = tabs.some((item) => item.id === tab) ? tab : "dashboard";
 
   return (
@@ -67,7 +74,7 @@ export default function ServerPage({ server, tab, now, history, onChanged, onDel
             </span>
           )}
         </div>
-        <div className="actions">
+        <div className="actions" hidden={!can("power")}>
           <button className="primary" disabled={live || server.state === "unreachable"} onClick={() => power("start")}>
             Start
           </button>
@@ -95,7 +102,7 @@ export default function ServerPage({ server, tab, now, history, onChanged, onDel
         ))}
       </nav>
 
-      {(current === "dashboard" || current === "console") && <Diagnosis server={server} />}
+      {(current === "dashboard" || current === "console") && can("console") && <Diagnosis server={server} />}
       {current === "dashboard" && <Dashboard server={server} now={now} history={history} />}
       {current === "console" && <Console serverId={server.id} running={running || starting} />}
       {current === "activity" && <ActivityPage server={server} />}
@@ -106,6 +113,7 @@ export default function ServerPage({ server, tab, now, history, onChanged, onDel
       {current === "backups" && <Backups server={server} />}
       {current === "network" && <NetworkPage server={server} />}
       {current === "schedules" && <Schedules server={server} />}
+      {current === "users" && <Users server={server} />}
       {current === "startup" && <StartupPage server={server} onChanged={onChanged} />}
       {current === "settings" && <Settings server={server} onChanged={onChanged} onDeleted={onDeleted} />}
     </>

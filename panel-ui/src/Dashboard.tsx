@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, formatBytes, formatTime, stateLabel, uptime, type Activity, type Network, type Players, type ServerInfo } from "./api";
+import { api, formatBytes, formatTime, stateLabel, uptime, type Activity, type Network, type Permission, type Players, type ServerInfo } from "./api";
 
 export type UsageHistory = { cpu: number[]; memory: number[] };
 
@@ -24,12 +24,14 @@ export default function Dashboard({ server, now, history }: Props) {
   const minecraft = server.kind === "minecraft";
 
   useEffect(() => {
-    api.network(server.id).then(setNetwork, () => {});
-    api.activity(server.id, 6).then(setActivity, () => {});
+    // Each part is shown only to people allowed to see it.
+    const can = (permission: Permission) => server.permissions.includes(permission);
+    if (can("network")) api.network(server.id).then(setNetwork, () => {});
+    if (can("activity")) api.activity(server.id, 6).then(setActivity, () => {});
     // Asking who is online types "list" into the console, so it is done once per visit, not on a timer.
-    if (minecraft && running) api.players(server.id).then(setPlayers, () => {});
+    if (minecraft && running && can("players")) api.players(server.id).then(setPlayers, () => {});
     else setPlayers(null);
-  }, [server.id, server.state, minecraft, running]);
+  }, [server.id, server.state, server.permissions, minecraft, running]);
 
   const limit = server.memoryLimitMb * 1024 * 1024;
   const address = network?.addresses[0];

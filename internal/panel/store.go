@@ -58,6 +58,16 @@ CREATE TABLE IF NOT EXISTS servers (
 	name    TEXT NOT NULL,
 	node_id INTEGER NOT NULL REFERENCES nodes(id)
 );
+CREATE TABLE IF NOT EXISTS server_users (
+	server_id   TEXT NOT NULL,
+	user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	permissions TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (server_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS settings (
+	key   TEXT PRIMARY KEY,
+	value TEXT NOT NULL
+);
 `
 
 const sessionLifetime = 30 * 24 * time.Hour
@@ -65,6 +75,8 @@ const sessionLifetime = 30 * 24 * time.Hour
 type User struct {
 	ID       int64  `json:"id"`
 	Username string `json:"username"`
+	// Admin is the account that set the panel up. It manages the panel itself and can open every server.
+	Admin bool `json:"admin"`
 }
 
 type Node struct {
@@ -78,6 +90,7 @@ type ServerRow struct {
 	ID        string
 	Name      string
 	NodeID    int64
+	OwnerID   int64  // the account that created the server
 	Kind      string // "generic" or "minecraft"
 	Software  string
 	MCVersion string
@@ -97,15 +110,22 @@ func OpenStore(path string) (*Store, error) {
 	// Columns added after the first version. SQLite has no "add if missing",
 	// so a "duplicate column" error just means an earlier run already did this.
 	for _, column := range []string{
-		"kind TEXT NOT NULL DEFAULT 'generic'",
-		"software TEXT NOT NULL DEFAULT ''",
-		"mc_version TEXT NOT NULL DEFAULT ''",
-		"forward TEXT NOT NULL DEFAULT ''",
+		"servers ADD COLUMN kind TEXT NOT NULL DEFAULT 'generic'",
+		"servers ADD COLUMN software TEXT NOT NULL DEFAULT ''",
+		"servers ADD COLUMN mc_version TEXT NOT NULL DEFAULT ''",
+		"servers ADD COLUMN forward TEXT NOT NULL DEFAULT ''",
+		"servers ADD COLUMN owner_id INTEGER NOT NULL DEFAULT 0",
+		"users ADD COLUMN admin INTEGER NOT NULL DEFAULT 0",
 	} {
-		if _, err := db.Exec("ALTER TABLE servers ADD COLUMN " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
+		if _, err := db.Exec("ALTER TABLE " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			db.Close()
 			return nil, err
 		}
+	}
+	// Panels set up before there were several accounts: the first account is the admin.
+	if _, err := db.Exec(`UPDATE users SET admin = 1 WHERE id = (SELECT MIN(id) FROM users) AND NOT EXISTS (SELECT 1 FROM users WHERE admin = 1)`); err != nil {
+		db.Close()
+		return nil, err
 	}
 	return &Store{db: db}, nil
 }
@@ -118,17 +138,23 @@ func (s *Store) HasUsers() (bool, error) {
 	return count > 0, err
 }
 
+// CreateUser adds an account. The first one ever made becomes the admin.
 func (s *Store) CreateUser(username, password string) (User, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return User{}, err
 	}
-	result, err := s.db.Exec(`INSERT INTO users (username, password_hash) VALUES (?, ?)`, username, string(hash))
+	result, err := s.db.Exec(`INSERT INTO users (username, password_hash, admin) VALUES (?, ?, NOT EXISTS (SELECT 1 FROM users))`, username, string(hash))
 	if err != nil {
 		return User{}, err
 	}
 	id, err := result.LastInsertId()
-	return User{ID: id, Username: username}, err
+	if err != nil {
+		return User{}, err
+	}
+	user := User{ID: id, Username: username}
+	err = s.db.QueryRow(`SELECT admin FROM users WHERE id = ?`, id).Scan(&user.Admin)
+	return user, err
 }
 
 var errBadLogin = errors.New("wrong username or password")
@@ -138,8 +164,8 @@ var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("consolry"), bcrypt.Defaul
 func (s *Store) CheckPassword(username, password string) (User, error) {
 	var user User
 	var hash string
-	err := s.db.QueryRow(`SELECT id, username, password_hash FROM users WHERE username = ?`, username).
-		Scan(&user.ID, &user.Username, &hash)
+	err := s.db.QueryRow(`SELECT id, username, admin, password_hash FROM users WHERE username = ? COLLATE NOCASE`, username).
+		Scan(&user.ID, &user.Username, &user.Admin, &hash)
 	if errors.Is(err, sql.ErrNoRows) {
 		// Hash anyway so a wrong username takes as long as a wrong password.
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
@@ -174,10 +200,10 @@ func (s *Store) NewSession(userID int64) (string, error) {
 func (s *Store) SessionUser(token string) (User, error) {
 	var user User
 	err := s.db.QueryRow(`
-		SELECT users.id, users.username FROM sessions
+		SELECT users.id, users.username, users.admin FROM sessions
 		JOIN users ON users.id = sessions.user_id
 		WHERE sessions.token_hash = ? AND sessions.expires_at > ?`,
-		hashToken(token), time.Now().Unix()).Scan(&user.ID, &user.Username)
+		hashToken(token), time.Now().Unix()).Scan(&user.ID, &user.Username, &user.Admin)
 	return user, err
 }
 
@@ -232,7 +258,7 @@ func (s *Store) DeleteNode(id int64) error {
 }
 
 func (s *Store) Servers() ([]ServerRow, error) {
-	rows, err := s.db.Query(`SELECT id, name, node_id, kind, software, mc_version FROM servers ORDER BY name`)
+	rows, err := s.db.Query(`SELECT id, name, node_id, owner_id, kind, software, mc_version FROM servers ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +266,7 @@ func (s *Store) Servers() ([]ServerRow, error) {
 	servers := []ServerRow{}
 	for rows.Next() {
 		var row ServerRow
-		if err := rows.Scan(&row.ID, &row.Name, &row.NodeID, &row.Kind, &row.Software, &row.MCVersion); err != nil {
+		if err := rows.Scan(&row.ID, &row.Name, &row.NodeID, &row.OwnerID, &row.Kind, &row.Software, &row.MCVersion); err != nil {
 			return nil, err
 		}
 		servers = append(servers, row)
@@ -250,8 +276,8 @@ func (s *Store) Servers() ([]ServerRow, error) {
 
 func (s *Store) Server(id string) (ServerRow, error) {
 	var row ServerRow
-	err := s.db.QueryRow(`SELECT id, name, node_id, kind, software, mc_version FROM servers WHERE id = ?`, id).
-		Scan(&row.ID, &row.Name, &row.NodeID, &row.Kind, &row.Software, &row.MCVersion)
+	err := s.db.QueryRow(`SELECT id, name, node_id, owner_id, kind, software, mc_version FROM servers WHERE id = ?`, id).
+		Scan(&row.ID, &row.Name, &row.NodeID, &row.OwnerID, &row.Kind, &row.Software, &row.MCVersion)
 	return row, err
 }
 
@@ -259,8 +285,8 @@ func (s *Store) CreateServer(row ServerRow) error {
 	if row.Kind == "" {
 		row.Kind = "generic"
 	}
-	_, err := s.db.Exec(`INSERT INTO servers (id, name, node_id, kind, software, mc_version) VALUES (?, ?, ?, ?, ?, ?)`,
-		row.ID, row.Name, row.NodeID, row.Kind, row.Software, row.MCVersion)
+	_, err := s.db.Exec(`INSERT INTO servers (id, name, node_id, owner_id, kind, software, mc_version) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		row.ID, row.Name, row.NodeID, row.OwnerID, row.Kind, row.Software, row.MCVersion)
 	return err
 }
 
@@ -269,6 +295,7 @@ func (s *Store) DeleteServer(id string) error {
 		return err
 	}
 	_, _ = s.db.Exec(`DELETE FROM activity WHERE server_id = ?`, id)
+	_, _ = s.db.Exec(`DELETE FROM server_users WHERE server_id = ?`, id)
 	_, err := s.db.Exec(`DELETE FROM servers WHERE id = ?`, id)
 	return err
 }

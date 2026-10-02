@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
-import { api, isLive, stateLabel, uptime, type NodeInfo, type PanelState, type ServerInfo } from "./api";
+import Access from "./Access";
+import { api, isLive, stateLabel, uptime, type NodeInfo, type PanelState, type ServerInfo, type User } from "./api";
 import NewServer from "./NewServer";
 import type { UsageHistory } from "./Dashboard";
 import ServerPage, { type Tab } from "./ServerPage";
 import { Empty, ErrorNote, useAction } from "./ui";
 
-type View = { kind: "overview" } | { kind: "server"; id: string; tab: Tab } | { kind: "new-server" } | { kind: "nodes" };
+type View = { kind: "overview" } | { kind: "server"; id: string; tab: Tab } | { kind: "new-server" } | { kind: "nodes" } | { kind: "access" };
 
 // The address after # decides the page, so a refresh or a shared link lands in the same place.
 function parseHash(hash: string): View {
@@ -13,6 +14,7 @@ function parseHash(hash: string): View {
   if (parts[0] === "servers" && parts[1]) return { kind: "server", id: parts[1], tab: (parts[2] || "dashboard") as Tab };
   if (parts[0] === "new") return { kind: "new-server" };
   if (parts[0] === "nodes") return { kind: "nodes" };
+  if (parts[0] === "access") return { kind: "access" };
   return { kind: "overview" };
 }
 
@@ -53,8 +55,8 @@ export default function App() {
   }
   if (!state) return null;
   if (state.setupNeeded) return <AuthForm mode="setup" onDone={refresh} />;
-  if (!state.user) return <AuthForm mode="login" onDone={refresh} />;
-  return <Panel username={state.user.username} version={state.version} onSignOut={() => api.logout().then(refresh)} />;
+  if (!state.user) return <SignedOut signupAllowed={state.signupAllowed} onDone={refresh} />;
+  return <Panel user={state.user} version={state.version} onSignOut={() => api.logout().then(refresh)} />;
 }
 
 function Logo() {
@@ -82,19 +84,49 @@ function Centered({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function AuthForm({ mode, onDone }: { mode: "setup" | "login"; onDone: () => void }) {
+/** The sign-in page and the sign-up page, at #/login and #/signup. */
+function SignedOut({ signupAllowed, onDone }: { signupAllowed: boolean; onDone: () => void }) {
+  const [hash, setHash] = useState(location.hash);
+  useEffect(() => {
+    const onChange = () => setHash(location.hash);
+    window.addEventListener("hashchange", onChange);
+    return () => window.removeEventListener("hashchange", onChange);
+  }, []);
+  const signup = signupAllowed && hash === "#/signup";
+  const done = () => {
+    location.hash = "#/";
+    onDone();
+  };
+  return (
+    <AuthForm key={signup ? "signup" : "login"} mode={signup ? "signup" : "login"} onDone={done}>
+      {signupAllowed &&
+        (signup ? (
+          <p className="dim switch">
+            Already have an account? <a href="#/login">Sign in</a>
+          </p>
+        ) : (
+          <p className="dim switch">
+            New here? <a href="#/signup">Create an account</a>
+          </p>
+        ))}
+    </AuthForm>
+  );
+}
+
+function AuthForm({ mode, onDone, children }: { mode: "setup" | "login" | "signup"; onDone: () => void; children?: ReactNode }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const setup = mode === "setup";
+  const creating = mode !== "login";
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
     setError("");
     try {
-      await (setup ? api.setup(username, password) : api.login(username, password));
+      await (setup ? api.setup(username, password) : mode === "signup" ? api.signup(username, password) : api.login(username, password));
       onDone();
     } catch (problem) {
       setError((problem as Error).message);
@@ -103,8 +135,11 @@ function AuthForm({ mode, onDone }: { mode: "setup" | "login"; onDone: () => voi
   }
 
   return (
-    <Centered title={setup ? "Create the admin account" : "Sign in"}>
+    <Centered title={setup ? "Create the admin account" : mode === "signup" ? "Create an account" : "Sign in"}>
       {setup && <p className="dim">This is the first run. The account you create here manages the whole panel.</p>}
+      {mode === "signup" && (
+        <p className="dim">After this, tell the server's owner your username so they can share the server with you.</p>
+      )}
       <form onSubmit={submit}>
         <label>
           Username
@@ -116,22 +151,24 @@ function AuthForm({ mode, onDone }: { mode: "setup" | "login"; onDone: () => voi
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            autoComplete={setup ? "new-password" : "current-password"}
-            minLength={setup ? 10 : undefined}
+            autoComplete={creating ? "new-password" : "current-password"}
+            minLength={creating ? 10 : undefined}
             required
           />
-          {setup && <small>At least 10 characters.</small>}
+          {creating && <small>At least 10 characters.</small>}
         </label>
         {error && <p className="error" role="alert">{error}</p>}
         <button className="primary" disabled={busy}>
-          {setup ? "Create account" : "Sign in"}
+          {creating ? "Create account" : "Sign in"}
         </button>
       </form>
+      {children}
     </Centered>
   );
 }
 
-function Panel({ username, version, onSignOut }: { username: string; version: string; onSignOut: () => void }) {
+function Panel({ user, version, onSignOut }: { user: User; version: string; onSignOut: () => void }) {
+  const { username, admin } = user;
   const [servers, setServers] = useState<ServerInfo[] | null>(null);
   const [nodes, setNodes] = useState<NodeInfo[] | null>(null);
   const [warning, setWarning] = useState("");
@@ -162,7 +199,8 @@ function Panel({ username, version, onSignOut }: { username: string; version: st
       ),
     [],
   );
-  const loadNodes = useCallback(() => api.nodes().then(setNodes, () => {}), []);
+  // Only the admin manages nodes; everyone else just sees the servers shared with them.
+  const loadNodes = useCallback(() => (admin ? api.nodes().then(setNodes, () => {}) : setNodes([])), [admin]);
 
   useEffect(() => {
     loadServers();
@@ -179,7 +217,7 @@ function Panel({ username, version, onSignOut }: { username: string; version: st
 
   const selected = view.kind === "server" ? servers.find((server) => server.id === view.id) : undefined;
   const crumb =
-    view.kind === "server" ? (selected?.name ?? "Unknown server") : view.kind === "new-server" ? "New server" : view.kind === "nodes" ? "Nodes" : "Overview";
+    view.kind === "server" ? (selected?.name ?? "Unknown server") : view.kind === "new-server" ? "New server" : view.kind === "nodes" ? "Nodes" : view.kind === "access" ? "Remote access" : "Overview";
 
   return (
     <div className="shell">
@@ -204,9 +242,16 @@ function Panel({ username, version, onSignOut }: { username: string; version: st
           <a href="#/" className={view.kind === "overview" ? "on" : undefined}>
             Overview
           </a>
-          <a href="#/nodes" className={view.kind === "nodes" ? "on" : undefined}>
-            Nodes <span className="count">{nodes.length}</span>
-          </a>
+          {admin && (
+            <a href="#/nodes" className={view.kind === "nodes" ? "on" : undefined}>
+              Nodes <span className="count">{nodes.length}</span>
+            </a>
+          )}
+          {admin && (
+            <a href="#/access" className={view.kind === "access" ? "on" : undefined}>
+              Remote access
+            </a>
+          )}
         </nav>
         <p className="pixel heading">Servers</p>
         <nav aria-label="Servers">
@@ -221,9 +266,11 @@ function Panel({ username, version, onSignOut }: { username: string; version: st
           ))}
           {servers.length === 0 && <p className="dim empty">None yet.</p>}
         </nav>
-        <a href="#/new" className={view.kind === "new-server" ? "add on" : "add"}>
-          + New server
-        </a>
+        {admin && (
+          <a href="#/new" className={view.kind === "new-server" ? "add on" : "add"}>
+            + New server
+          </a>
+        )}
       </aside>
 
       <main className="content">
@@ -235,7 +282,7 @@ function Panel({ username, version, onSignOut }: { username: string; version: st
             </button>
           </p>
         )}
-        {view.kind === "overview" && <Overview servers={servers} nodes={nodes} now={now} onChanged={loadServers} />}
+        {view.kind === "overview" && <Overview servers={servers} nodes={nodes} now={now} user={user} onChanged={loadServers} />}
         {view.kind === "server" && selected && (
           <ServerPage
             key={selected.id}
@@ -255,7 +302,7 @@ function Panel({ username, version, onSignOut }: { username: string; version: st
             It may have been removed.
           </Empty>
         )}
-        {view.kind === "new-server" && (
+        {view.kind === "new-server" && admin && (
           <NewServer
             nodes={nodes}
             onCreated={(id, note) => {
@@ -266,20 +313,30 @@ function Panel({ username, version, onSignOut }: { username: string; version: st
             }}
           />
         )}
-        {view.kind === "nodes" && <Nodes nodes={nodes} onChanged={loadNodes} />}
+        {view.kind === "nodes" && admin && <Nodes nodes={nodes} onChanged={loadNodes} />}
+        {view.kind === "access" && admin && <Access />}
       </main>
     </div>
   );
 }
 
-function Overview({ servers, nodes, now, onChanged }: { servers: ServerInfo[]; nodes: NodeInfo[]; now: number; onChanged: () => void }) {
+function Overview({ servers, nodes, now, user, onChanged }: { servers: ServerInfo[]; nodes: NodeInfo[]; now: number; user: User; onChanged: () => void }) {
+  const admin = user.admin;
   const { error, run } = useAction();
   const power = (id: string, action: "start" | "stop") => run(action, () => api.power(id, action), onChanged);
   const running = servers.filter((server) => server.state === "running").length;
   const trouble = servers.filter((server) => server.state === "crashed" || server.state === "unreachable").length;
   const online = nodes.filter((node) => node.online).length;
 
-  if (nodes.length === 0) {
+  if (!admin && servers.length === 0) {
+    return (
+      <Empty title="No servers shared with you yet">
+        Tell the server's owner your username, <strong>{user.username}</strong>, and ask them to invite you from the server's Users tab.
+      </Empty>
+    );
+  }
+
+  if (admin && nodes.length === 0) {
     return (
       <Empty title="Connect your first node" action={<a className="button primary" href="#/nodes">Add a node</a>}>
         A node is a machine running the Consolry daemon. Servers run on nodes, so add one to get started.
@@ -291,9 +348,11 @@ function Overview({ servers, nodes, now, onChanged }: { servers: ServerInfo[]; n
     <>
       <header className="page-head">
         <h1>Overview</h1>
-        <a className="button primary" href="#/new">
-          New server
-        </a>
+        {admin && (
+          <a className="button primary" href="#/new">
+            New server
+          </a>
+        )}
       </header>
 
       <dl className="tiles">
@@ -307,12 +366,14 @@ function Overview({ servers, nodes, now, onChanged }: { servers: ServerInfo[]; n
           <dt>Need attention</dt>
           <dd>{trouble}</dd>
         </div>
-        <div>
-          <dt>Nodes online</dt>
-          <dd>
-            {online} <small>of {nodes.length}</small>
-          </dd>
-        </div>
+        {admin && (
+          <div>
+            <dt>Nodes online</dt>
+            <dd>
+              {online} <small>of {nodes.length}</small>
+            </dd>
+          </div>
+        )}
       </dl>
 
       <ErrorNote message={error} />
@@ -343,7 +404,7 @@ function Overview({ servers, nodes, now, onChanged }: { servers: ServerInfo[]; n
                   </div>
                 </dl>
                 <div className="server-actions">
-                  {live ? (
+                  {!server.permissions.includes("power") ? null : live ? (
                     <button disabled={server.state === "stopping"} onClick={() => power(server.id, "stop")}>
                       Stop
                     </button>

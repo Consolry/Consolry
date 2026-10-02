@@ -1751,3 +1751,102 @@ pre.command {
   font-size: 1.3rem;
   user-select: all;
 }
+
+/* Sharing a server, and remote access */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.auth .switch {
+  margin: 14px 0 0;
+  text-align: center;
+}
+
+.permissions {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px 18px;
+}
+
+.permissions legend {
+  margin-bottom: 8px;
+}
+
+.check span {
+  display: grid;
+  gap: 2px;
+}
+
+.check small {
+  color: var(--dim);
+  font-weight: 400;
+}
+
+.members {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 18px;
+  padding: 0;
+  list-style: none;
+}
+
+.members li {
+  display: grid;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 2px solid var(--line);
+}
+
+.member-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.member-head .grow {
+  flex: 1 1 200px;
+}
+
+.addresses {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.addresses dt {
+  color: var(--dim);
+  font-size: 0.85rem;
+}
+
+.addresses dd {
+  margin: 2px 0 0;
+}
+
+.addresses code {
+  font-size: 1.05rem;
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+
+.steps {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 1.2em;
+}
+
+.auth .switch a {
+  color: var(--accent);
+}
+
+section.card.form {
+  display: grid;
+  gap: 16px;
+}

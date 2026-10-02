@@ -107,6 +107,17 @@ func forwardPort(ctx context.Context, port int) (forwardResult, error) {
 	return result, nil
 }
 
+// OpenPort forwards a port on this machine's router for the panel itself, the same way
+// a server's port is opened. It returns the router's public address and whether that
+// address can really be reached from the internet.
+func OpenPort(ctx context.Context, port int) (externalIP string, reachable bool, err error) {
+	result, err := forwardPort(ctx, port)
+	return result.ExternalIP, result.Reachable, err
+}
+
+// ClosePort removes a forward made by OpenPort.
+func ClosePort(ctx context.Context, port int) error { return unforwardPort(ctx, port) }
+
 func unforwardPort(ctx context.Context, port int) error {
 	router, err := findGateway(ctx)
 	if err != nil {
