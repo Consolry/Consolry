@@ -161,7 +161,7 @@ func TestPanelEndToEnd(t *testing.T) {
 	}
 	expect("echo: hello")
 
-	if got := serverState(c, server.ID); got != "running" {
+	if got := stateOf(c, server.ID); got != "running" {
 		t.Fatalf("state is %q, want running", got)
 	}
 	if code := c.do("DELETE", "/api/servers/"+server.ID, nil, nil); code != http.StatusConflict {
@@ -173,9 +173,9 @@ func TestPanelEndToEnd(t *testing.T) {
 	}
 	expect("bye")
 	deadline := time.Now().Add(10 * time.Second)
-	for serverState(c, server.ID) != "offline" {
+	for stateOf(c, server.ID) != "offline" {
 		if time.Now().After(deadline) {
-			t.Fatalf("server never went offline, state %q", serverState(c, server.ID))
+			t.Fatalf("server never went offline, state %q", stateOf(c, server.ID))
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -199,7 +199,7 @@ func mustURL(t *testing.T, raw string) *url.URL {
 	return parsed
 }
 
-func serverState(c client, id string) string {
+func stateOf(c client, id string) string {
 	var servers []struct {
 		ID    string `json:"id"`
 		State string `json:"state"`

@@ -28,6 +28,9 @@ type Spec struct {
 	Command     string   `json:"command"`
 	Args        []string `json:"args"`
 	StopCommand string   `json:"stopCommand"`
+	// Java is the oldest Java version this server can run on. When set and the command is
+	// plain "java", the daemon picks a suitable Java itself. Zero means run the command as written.
+	Java int `json:"java,omitempty"`
 }
 
 const (
@@ -37,8 +40,9 @@ const (
 
 // Server is one game server process and its console history.
 type Server struct {
-	spec Spec
-	dir  string
+	spec    Spec
+	dir     string
+	javaDir string
 
 	mu        sync.Mutex
 	state     State
@@ -49,8 +53,8 @@ type Server struct {
 	subs      map[chan string]struct{}
 }
 
-func newServer(spec Spec, dir string) *Server {
-	return &Server{spec: spec, dir: dir, state: StateOffline, subs: map[chan string]struct{}{}}
+func newServer(spec Spec, dir, javaDir string) *Server {
+	return &Server{spec: spec, dir: dir, javaDir: javaDir, state: StateOffline, subs: map[chan string]struct{}{}}
 }
 
 func (s *Server) State() State {
@@ -79,7 +83,16 @@ func (s *Server) Start() error {
 		return err
 	}
 
-	cmd := exec.Command(s.spec.Command, s.spec.Args...)
+	program := s.spec.Command
+	if s.spec.Java > 0 && program == "java" {
+		var err error
+		if program, err = javaFor(s.javaDir, s.spec.Java); err != nil {
+			s.state = StateCrashed
+			s.appendLocked("[consolry] Could not start: " + err.Error())
+			return err
+		}
+	}
+	cmd := exec.Command(program, s.spec.Args...)
 	cmd.Dir = s.dir
 	prepare(cmd)
 	stdin, err := cmd.StdinPipe()

@@ -377,7 +377,9 @@ function Nodes({ nodes, onChanged }: { nodes: NodeInfo[]; onChanged: () => void 
       <header className="page-head">
         <h1>Nodes</h1>
       </header>
-      <p className="dim lead">A node is a machine running the Consolry daemon. Servers run on nodes.</p>
+      <p className="dim lead">
+        A node is a machine that runs servers. This machine is added for you. Add another only if you run the Consolry daemon on a second machine.
+      </p>
 
       {nodes.length > 0 && (
         <ul className="nodes">
@@ -398,7 +400,7 @@ function Nodes({ nodes, onChanged }: { nodes: NodeInfo[]; onChanged: () => void 
       )}
 
       <form className="card form" onSubmit={submit}>
-        <h2>Add a node</h2>
+        <h2>Add another machine</h2>
         <label>
           Name
           <input value={name} onChange={(event) => setName(event.target.value)} required />

@@ -98,6 +98,7 @@ func TestBackupAndRestore(t *testing.T) {
 	a, _, _ := newAPI(t)
 	a.do("PUT", "/servers/files/files/content?path=world/level.dat", "original world")
 	a.do("PUT", "/servers/files/files/content?path=server.properties", "motd=before")
+	a.do("PUT", "/servers/files/files/content?path=libraries/big.jar", "downloaded again by the server")
 
 	code, created := a.do("POST", "/servers/files/backups", "")
 	var backup backupInfo
@@ -116,6 +117,14 @@ func TestBackupAndRestore(t *testing.T) {
 	}
 	if code, _ := a.do("GET", "/servers/files/files/content?path=added-later.txt", ""); code != http.StatusNotFound {
 		t.Errorf("a file added after the backup should be gone after restore, got %d", code)
+	}
+
+	// Folders the server rebuilds by itself are not backed up, and a restore leaves them in place.
+	if _, body := a.do("GET", "/servers/files/files/content?path=libraries/big.jar", ""); body != "downloaded again by the server" {
+		t.Errorf("a restore should not touch the libraries folder, got %q", body)
+	}
+	if backup.Size > 2000 {
+		t.Errorf("backup is %d bytes; the libraries folder should have been left out", backup.Size)
 	}
 
 	_, listing := a.do("GET", "/servers/files/backups", "")

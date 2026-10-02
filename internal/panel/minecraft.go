@@ -90,6 +90,7 @@ func minecraftSpec(ctx context.Context, id string, input minecraftInput) (daemon
 		Command:     "java",
 		Args:        []string{"-Xms" + memory, "-Xmx" + memory, "-jar", "server.jar", "nogui"},
 		StopCommand: "stop",
+		Java:        download.JavaMin,
 	}
 	return spec, download, nil
 }
@@ -102,24 +103,6 @@ func installMinecraft(ctx context.Context, node Node, id string, download minecr
 	}
 	eula := "# Accepted through the Consolry panel when this server was created.\n# https://aka.ms/MinecraftEULA\neula=true\n"
 	return node.putFile(ctx, id, "eula.txt", []byte(eula))
-}
-
-// javaWarning says, in a sentence, if the node's Java cannot run this server.
-func javaWarning(ctx context.Context, node Node, needed int) string {
-	var java struct {
-		Found bool `json:"found"`
-		Major int  `json:"major"`
-	}
-	if node.call(ctx, http.MethodGet, "/java", nil, &java) != nil {
-		return ""
-	}
-	if !java.Found {
-		return fmt.Sprintf("Java isn't installed on this node. Install Java %d or newer before starting the server.", needed)
-	}
-	if java.Major < needed {
-		return fmt.Sprintf("This node has Java %d, but this version of Minecraft needs Java %d or newer. Update Java before starting the server.", java.Major, needed)
-	}
-	return ""
 }
 
 // --- plugins and mods ---
@@ -269,6 +252,10 @@ func (a *App) handlePluginInstall(w http.ResponseWriter, r *http.Request) {
 	}
 	delete(have, input.ProjectID)
 
+	if err := backupFirst(r.Context(), node, row.ID); err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
 	installed := []string{}
 	if err := installProject(r.Context(), node, row, software, input.ProjectID, have, &installed); err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
@@ -311,6 +298,10 @@ func (a *App) handlePluginUpdate(w http.ResponseWriter, r *http.Request) {
 	file, ok := updates[current.SHA1].File()
 	if !ok || file.SHA1 == current.SHA1 {
 		writeError(w, http.StatusConflict, "this is already the newest version for this server")
+		return
+	}
+	if err := backupFirst(r.Context(), node, row.ID); err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
 		return
 	}
 	fetch := map[string]string{"url": file.URL, "path": software.Folder + "/" + file.Filename, "sha512": file.SHA512}

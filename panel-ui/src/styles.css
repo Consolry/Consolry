@@ -1290,3 +1290,78 @@ legend {
 .content > .console {
   flex: 1 0 340px;
 }
+
+/* Schedules, players and settings */
+
+.schedules,
+.players,
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.rows li.off strong {
+  color: var(--dim);
+}
+
+.panel-block > .search {
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+
+.form.wide {
+  max-width: 860px;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px 24px;
+  width: 100%;
+  align-items: start;
+}
+
+.diff {
+  width: 100%;
+  padding: 12px 14px;
+  background: #050b15;
+  box-shadow: var(--pixel-box);
+}
+
+.diff .pixel {
+  margin-bottom: 8px;
+  color: var(--warn);
+}
+
+.diff pre {
+  display: grid;
+  margin: 0 0 6px;
+  font: 13px/1.6 var(--mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diff del {
+  color: #ffa8a8;
+  text-decoration: none;
+  background: color-mix(in srgb, var(--bad) 14%, transparent);
+}
+
+.diff ins {
+  color: var(--ok);
+  text-decoration: none;
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+}
+
+.diff del::before {
+  content: "- ";
+}
+
+.diff ins::before {
+  content: "+ ";
+}
+
+input[type="time"] {
+  font-family: var(--mono);
+}

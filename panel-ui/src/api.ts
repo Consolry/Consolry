@@ -20,7 +20,33 @@ export type ServerInfo = {
 };
 export type Software = { id: string; name: string; about: string; folder: string };
 export type FileEntry = { name: string; dir: boolean; size: number; modified: number };
-export type Backup = { name: string; size: number; created: number; skipped?: string[] };
+export type Backup = { name: string; size: number; created: number; kind: "manual" | "auto" | "scheduled"; skipped?: string[] };
+export type ScheduleAction = "start" | "stop" | "restart" | "backup" | "command";
+export type ScheduleMode = "interval" | "daily" | "weekly";
+export type Schedule = {
+  id: number;
+  action: ScheduleAction;
+  command: string;
+  mode: ScheduleMode;
+  minutes: number;
+  at: string;
+  weekday: number;
+  enabled: boolean;
+  lastRun: number;
+  lastResult: string;
+  nextRun: number;
+};
+export type NewSchedule = Pick<Schedule, "action" | "command" | "mode" | "minutes" | "at" | "weekday">;
+export type Players = {
+  running: boolean;
+  online: string[];
+  max: number;
+  whitelist: string[];
+  whitelistEnabled: boolean;
+  operators: string[];
+  banned: { name: string; reason: string }[];
+};
+export type ServerPatch = { name?: string; memoryMb?: number; startCommand?: string; stopCommand?: string };
 export type Plugin = {
   file: string;
   size: number;
@@ -76,6 +102,18 @@ export const api = {
   deleteServer: (id: string) => request<void>("DELETE", `/servers/${id}`),
   power: (id: string, action: PowerAction) => request<{ state: string }>("POST", `/servers/${id}/power`, { action }),
   diagnosis: (id: string) => request<Finding[]>("GET", `/servers/${id}/diagnosis`),
+  updateServer: (id: string, patch: ServerPatch) => request<void>("PATCH", `/servers/${id}`, patch),
+  switchVersion: (id: string, software: string, version: string) =>
+    request<{ warning: string }>("POST", `/servers/${id}/minecraft/version`, { software, version }),
+
+  players: (id: string) => request<Players>("GET", `/servers/${id}/players`),
+  playerAction: (id: string, action: string, name = "", reason = "") => request<void>("POST", `/servers/${id}/players`, { action, name, reason }),
+
+  schedules: (id: string) => request<Schedule[]>("GET", `/servers/${id}/schedules`),
+  createSchedule: (id: string, input: NewSchedule) => request<Schedule>("POST", `/servers/${id}/schedules`, input),
+  setScheduleEnabled: (scheduleId: number, enabled: boolean) => request<void>("PATCH", `/schedules/${scheduleId}`, { enabled }),
+  deleteSchedule: (scheduleId: number) => request<void>("DELETE", `/schedules/${scheduleId}`),
+  runSchedule: (scheduleId: number) => request<{ result: string }>("POST", `/schedules/${scheduleId}/run`, {}),
 
   software: () => request<Software[]>("GET", "/minecraft/software"),
   versions: (software: string) => request<string[]>("GET", `/minecraft/versions?software=${q(software)}`),

@@ -31,6 +31,20 @@ CREATE TABLE IF NOT EXISTS nodes (
 	url   TEXT NOT NULL,
 	token TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS schedules (
+	id          INTEGER PRIMARY KEY,
+	server_id   TEXT NOT NULL,
+	action      TEXT NOT NULL,
+	command     TEXT NOT NULL DEFAULT '',
+	mode        TEXT NOT NULL,
+	minutes     INTEGER NOT NULL DEFAULT 0,
+	at          TEXT NOT NULL DEFAULT '',
+	weekday     INTEGER NOT NULL DEFAULT 0,
+	enabled     INTEGER NOT NULL DEFAULT 1,
+	created_at  INTEGER NOT NULL,
+	last_run    INTEGER NOT NULL DEFAULT 0,
+	last_result TEXT NOT NULL DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS servers (
 	id      TEXT PRIMARY KEY,
 	name    TEXT NOT NULL,
@@ -242,6 +256,9 @@ func (s *Store) CreateServer(row ServerRow) error {
 }
 
 func (s *Store) DeleteServer(id string) error {
+	if _, err := s.db.Exec(`DELETE FROM schedules WHERE server_id = ?`, id); err != nil {
+		return err
+	}
 	_, err := s.db.Exec(`DELETE FROM servers WHERE id = ?`, id)
 	return err
 }

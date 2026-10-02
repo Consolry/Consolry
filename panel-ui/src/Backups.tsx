@@ -23,7 +23,10 @@ export default function Backups({ server }: { server: ServerInfo }) {
   return (
     <section className="backups">
       <header className="bar">
-        <p className="grow dim">A backup is a copy of every file in the server's folder, kept on the node.</p>
+        <p className="grow dim">
+          A backup is a copy of every file in the server's folder. One is taken automatically before plugins or the version change; the newest 5 of
+          those are kept.
+        </p>
         <button className="primary small" disabled={busy !== ""} onClick={() =>
             run("create", async () => {
               const backup = await api.createBackup(server.id);
@@ -46,7 +49,11 @@ export default function Backups({ server }: { server: ServerInfo }) {
             <li key={backup.name}>
               <span className="grow">
                 <strong>{formatTime(backup.created)}</strong>
-                <small>{formatBytes(backup.size)}</small>
+                <small>
+                  {formatBytes(backup.size)}
+                  {backup.kind === "auto" && " · taken automatically before a change"}
+                  {backup.kind === "scheduled" && " · taken by a schedule"}
+                </small>
               </span>
               {confirming?.name === backup.name ? (
                 <>

@@ -1,10 +1,9 @@
-// Command consolry-daemon runs on each machine that hosts game servers.
+// Command consolry-daemon runs on an extra machine that hosts game servers.
+// The panel has a daemon built in, so this is only needed for a second machine.
 package main
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
 	"flag"
 	"log"
@@ -12,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/DinoNaedYT/Consolry/internal/daemon"
@@ -28,7 +26,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("could not open data directory: %v", err)
 	}
-	token, created, err := loadToken(*dataDir)
+	token, created, err := daemon.LoadToken(*dataDir)
 	if err != nil {
 		log.Fatalf("could not read daemon token: %v", err)
 	}
@@ -60,26 +58,4 @@ func main() {
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
-}
-
-// loadToken returns the shared secret the panel uses to talk to this daemon.
-// CONSOLRY_DAEMON_TOKEN wins; otherwise one is generated once and kept in the data directory.
-func loadToken(dir string) (token string, created bool, err error) {
-	if env := strings.TrimSpace(os.Getenv("CONSOLRY_DAEMON_TOKEN")); env != "" {
-		return env, false, nil
-	}
-	path := filepath.Join(dir, "token")
-	data, err := os.ReadFile(path)
-	if err == nil {
-		return strings.TrimSpace(string(data)), false, nil
-	}
-	if !errors.Is(err, os.ErrNotExist) {
-		return "", false, err
-	}
-	raw := make([]byte, 32)
-	if _, err := rand.Read(raw); err != nil {
-		return "", false, err
-	}
-	token = hex.EncodeToString(raw)
-	return token, true, os.WriteFile(path, []byte(token+"\n"), 0o600)
 }

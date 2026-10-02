@@ -52,6 +52,15 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("GET /api/servers", a.authed(a.handleServers))
 	mux.Handle("POST /api/servers", a.authed(a.handleCreateServer))
 	mux.Handle("DELETE /api/servers/{id}", a.authed(a.handleDeleteServer))
+	mux.Handle("PATCH /api/servers/{id}", a.authed(a.handleUpdateServer))
+	mux.Handle("POST /api/servers/{id}/minecraft/version", a.authed(a.handleSwitchVersion))
+	mux.Handle("GET /api/servers/{id}/players", a.authed(a.handlePlayers))
+	mux.Handle("POST /api/servers/{id}/players", a.authed(a.handlePlayerAction))
+	mux.Handle("GET /api/servers/{id}/schedules", a.authed(a.handleSchedules))
+	mux.Handle("POST /api/servers/{id}/schedules", a.authed(a.handleCreateSchedule))
+	mux.Handle("PATCH /api/schedules/{sid}", a.authed(a.handleUpdateSchedule))
+	mux.Handle("DELETE /api/schedules/{sid}", a.authed(a.handleDeleteSchedule))
+	mux.Handle("POST /api/schedules/{sid}/run", a.authed(a.handleRunSchedule))
 	mux.Handle("POST /api/servers/{id}/power", a.authed(a.handlePower))
 	mux.Handle("GET /api/servers/{id}/console", a.authed(a.handleConsole))
 	mux.Handle("GET /api/servers/{id}/diagnosis", a.authed(a.handleDiagnosis))
@@ -436,7 +445,7 @@ func (a *App) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusBadGateway, err.Error())
 			return
 		}
-		warning = javaWarning(r.Context(), node, download.JavaMin)
+		warning = ensureJava(r.Context(), node, download.JavaMin)
 	}
 	if err := a.store.CreateServer(row); err != nil {
 		undo()

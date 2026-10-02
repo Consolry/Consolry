@@ -4,16 +4,19 @@ A game server panel that knows your game. Pre-release: this repository holds the
 
 ## What works today
 
-- **Daemon** (`consolry-daemon`): runs servers as processes on Windows or Linux, keeps their console history, stops them cleanly, manages their files and takes backups.
-- **Panel** (`consolry`): first-run admin account, sign-in, nodes, servers, start/stop/kill, and a live searchable console in the browser.
-- **Files**: browse, edit, upload, download, rename and delete, confined to each server's own folder.
-- **Backups**: zip the whole server folder, restore, download or delete.
-- **Minecraft**: create a Paper, Purpur or Fabric server by picking a version; the server jar is downloaded and checked for you.
-- **Plugins and mods**: search Modrinth, install with required dependencies, update, and see which installed files match what Modrinth published.
-- **Crash explainer**: reads the log of the last run and explains common failures in plain language. It runs locally.
-- One SQLite file for the panel's data. The web interface is built into the panel binary.
+Consolry is for running game servers on your own Windows or Linux machine. You install it, you run it.
 
-Not built yet: schedules, roles and extra users, two-factor login, config forms, player manager, automatic Java install, Hangar and CurseForge sources, off-site backups, SFTP, and containers on Linux. See the [roadmap](https://www.consolry.com/roadmap).
+- **One program.** `consolry` is the panel and also runs the servers on the machine it is installed on. Nothing else to start, no token to copy.
+- **Minecraft servers.** Pick Paper, Purpur or Fabric and a version. The server is downloaded and checked, and a suitable Java is installed privately if the machine has none.
+- **Console, files and backups.** A live searchable console; a file manager with an editor; backups you can restore, download or delete.
+- **Plugins and mods.** Search Modrinth, install with required dependencies, update, and see which installed files match what Modrinth published.
+- **Players.** Who is online, plus the whitelist, operators and bans.
+- **Schedules.** Restart, back up or run a console command daily, weekly or every few hours.
+- **Automatic safety backups** before plugin changes and version switches, with old ones cleared out.
+- **Settings.** Rename, change memory, switch Minecraft version, and edit the common game settings in a form that shows what will change.
+- **Crash explainer.** Reads the last run's log and explains common failures in plain language, on your machine.
+
+Not built yet: two-factor login, extra users, notifications, automatic port forwarding, Hangar and CurseForge sources, off-site backups, containers on Linux, an installer, and config forms for individual plugins. See the [roadmap](https://www.consolry.com/roadmap).
 
 ## Layout
 
@@ -41,14 +44,15 @@ cd ..
 # 2. Build both programs into ./bin
 go build -o bin/ ./cmd/...
 
-# 3. Start the daemon, then the panel
-./bin/consolry-daemon     # prints a token the first time it starts
-./bin/consolry            # open http://127.0.0.1:8700
+# 3. Start it
+./bin/consolry            # then open http://127.0.0.1:8700
 ```
 
-In the panel: create the admin account, add a node with the address `http://127.0.0.1:8750` and the daemon's token, then create a server.
+Create the admin account, then create a server. This machine is already set up as the place servers run.
 
-A Minecraft server needs Java installed on the node. Each server lives in its own folder under the daemon's data directory (`daemon-data/servers/<id>` by default).
+Server files, backups and any Java that Consolry installs live in `daemon-data` next to where you start it; the panel's own data is `consolry.db`.
+
+To run servers on a second machine as well, start `consolry-daemon` there and add it on the Nodes page with the token it prints.
 
 ## Tests
 

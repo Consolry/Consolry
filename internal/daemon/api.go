@@ -37,6 +37,40 @@ func Handler(m *Manager, token, version string) http.Handler {
 		writeJSON(w, http.StatusCreated, spec)
 	})
 
+	mux.HandleFunc("PUT /servers/{id}", func(w http.ResponseWriter, r *http.Request) {
+		var spec Spec
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<20)).Decode(&spec); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		if err := m.Update(r.PathValue("id"), spec); err != nil {
+			writeError(w, statusFor(err), err.Error())
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	// command types one line into a running server's console.
+	mux.HandleFunc("POST /servers/{id}/command", func(w http.ResponseWriter, r *http.Request) {
+		var input struct {
+			Command string `json:"command"`
+		}
+		if json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&input) != nil || strings.ContainsAny(input.Command, "\r\n") || input.Command == "" {
+			writeError(w, http.StatusBadRequest, "send one command on a single line")
+			return
+		}
+		s, err := m.Get(r.PathValue("id"))
+		if err != nil {
+			writeError(w, statusFor(err), err.Error())
+			return
+		}
+		if err := s.Send(input.Command); err != nil {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	mux.HandleFunc("DELETE /servers/{id}", func(w http.ResponseWriter, r *http.Request) {
 		if err := m.Remove(r.PathValue("id")); err != nil {
 			writeError(w, statusFor(err), err.Error())
@@ -117,6 +151,7 @@ func Handler(m *Manager, token, version string) http.Handler {
 
 	registerFiles(mux, m)
 	registerBackups(mux, m)
+	registerJava(mux, m)
 
 	return requireToken(token, mux)
 }

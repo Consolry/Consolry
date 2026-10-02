@@ -8,7 +8,6 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -17,25 +16,40 @@ import (
 	"time"
 )
 
-var validBackup = regexp.MustCompile(`^[0-9]{8}-[0-9]{6}\.zip$`)
+// A backup's name is its UTC time, plus a marker when it was not made by hand.
+var validBackup = regexp.MustCompile(`^[0-9]{8}-[0-9]{6}(-auto|-scheduled)?\.zip$`)
+
+// autoReuse is how recent an automatic backup must be to count for the next change too,
+// so installing five plugins in a row does not copy the world five times.
+const autoReuse = 10 * time.Minute
 
 type backupInfo struct {
 	Name    string `json:"name"`
 	Size    int64  `json:"size"`
 	Created int64  `json:"created"`
+	// Kind is "manual", "auto" (taken before a change) or "scheduled".
+	Kind string `json:"kind"`
 	// Skipped lists files a running server had locked, which could not be copied.
 	Skipped []string `json:"skipped,omitempty"`
 }
 
+// rebuilt names top-level folders the server software downloads or generates again by itself.
+// They are left out of backups, which keeps a fresh server's backup small, and a restore leaves them alone.
+var rebuilt = map[string]bool{"cache": true, "libraries": true, "versions": true, ".fabric": true}
+
 func (m *Manager) backupDir(id string) string { return filepath.Join(m.dir, "backups", id) }
 
 // createBackup zips the whole server folder. Backups live outside it, so they survive a restore.
-func (m *Manager) createBackup(s *Server) (backupInfo, error) {
+func (m *Manager) createBackup(s *Server, kind string) (backupInfo, error) {
 	dir := m.backupDir(s.spec.ID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return backupInfo{}, err
 	}
-	name := time.Now().UTC().Format("20060102-150405") + ".zip"
+	suffix := ""
+	if kind == "auto" || kind == "scheduled" {
+		suffix = "-" + kind
+	}
+	name := time.Now().UTC().Format("20060102-150405") + suffix + ".zip"
 	tmp := filepath.Join(dir, name+".part")
 	out, err := os.Create(tmp)
 	if err != nil {
@@ -55,6 +69,9 @@ func (m *Manager) createBackup(s *Server) (backupInfo, error) {
 	err = fs.WalkDir(root.FS(), ".", func(p string, entry fs.DirEntry, err error) error {
 		if err != nil || p == "." {
 			return err
+		}
+		if entry.IsDir() && rebuilt[p] {
+			return fs.SkipDir
 		}
 		info, err := entry.Info()
 		if err != nil {
@@ -118,7 +135,46 @@ func (m *Manager) createBackup(s *Server) (backupInfo, error) {
 	if err != nil {
 		return backupInfo{}, err
 	}
-	return backupInfo{Name: name, Size: info.Size(), Created: info.ModTime().Unix(), Skipped: skipped}, nil
+	return backupInfo{Name: name, Size: info.Size(), Created: info.ModTime().Unix(), Kind: backupKind(name), Skipped: skipped}, nil
+}
+
+func backupKind(name string) string {
+	switch {
+	case strings.HasSuffix(name, "-auto.zip"):
+		return "auto"
+	case strings.HasSuffix(name, "-scheduled.zip"):
+		return "scheduled"
+	}
+	return "manual"
+}
+
+// listBackups returns a server's backups, newest first.
+func (m *Manager) listBackups(id string) []backupInfo {
+	list := []backupInfo{}
+	entries, _ := os.ReadDir(m.backupDir(id))
+	for _, entry := range entries {
+		if info, err := entry.Info(); err == nil && validBackup.MatchString(entry.Name()) {
+			list = append(list, backupInfo{Name: entry.Name(), Size: info.Size(), Created: info.ModTime().Unix(), Kind: backupKind(entry.Name())})
+		}
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].Name > list[j].Name })
+	return list
+}
+
+// prune deletes the oldest backups of one kind beyond the newest keep. Manual backups are never pruned.
+func (m *Manager) prune(id, kind string, keep int) {
+	if kind == "manual" || keep < 1 {
+		return
+	}
+	kept := 0
+	for _, backup := range m.listBackups(id) {
+		if backup.Kind != kind {
+			continue
+		}
+		if kept++; kept > keep {
+			os.Remove(filepath.Join(m.backupDir(id), backup.Name))
+		}
+	}
 }
 
 // restoreBackup replaces the server folder's contents with the backup's.
@@ -143,6 +199,9 @@ func (m *Manager) restoreBackup(s *Server, name string) error {
 		return err
 	}
 	for _, entry := range existing {
+		if entry.IsDir() && rebuilt[entry.Name()] {
+			continue
+		}
 		if err := root.RemoveAll(entry.Name()); err != nil {
 			return err
 		}
@@ -200,15 +259,7 @@ func registerBackups(mux *http.ServeMux, m *Manager) {
 		if !ok {
 			return
 		}
-		list := []backupInfo{}
-		entries, _ := os.ReadDir(m.backupDir(s.spec.ID))
-		for _, entry := range entries {
-			if info, err := entry.Info(); err == nil && validBackup.MatchString(entry.Name()) {
-				list = append(list, backupInfo{Name: entry.Name(), Size: info.Size(), Created: info.ModTime().Unix()})
-			}
-		}
-		sort.Slice(list, func(i, j int) bool { return list[i].Name > list[j].Name })
-		writeJSON(w, http.StatusOK, list)
+		writeJSON(w, http.StatusOK, m.listBackups(s.spec.ID))
 	})
 
 	mux.HandleFunc("POST /servers/{id}/backups", func(w http.ResponseWriter, r *http.Request) {
@@ -216,7 +267,23 @@ func registerBackups(mux *http.ServeMux, m *Manager) {
 		if !ok {
 			return
 		}
-		info, err := m.createBackup(s)
+		kind := r.URL.Query().Get("kind")
+		if kind != "auto" && kind != "scheduled" {
+			kind = "manual"
+		}
+		if kind == "auto" {
+			for _, recent := range m.listBackups(s.spec.ID) {
+				if recent.Kind == "auto" && time.Since(time.Unix(recent.Created, 0)) < autoReuse {
+					writeJSON(w, http.StatusOK, recent)
+					return
+				}
+			}
+		}
+		info, err := m.createBackup(s, kind)
+		if err == nil {
+			keep, _ := strconv.Atoi(r.URL.Query().Get("keep"))
+			m.prune(s.spec.ID, kind, keep)
+		}
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, tidyError(err))
 			return
@@ -261,34 +328,4 @@ func registerBackups(mux *http.ServeMux, m *Manager) {
 		w.WriteHeader(http.StatusNoContent)
 	})
 
-	// java reports the Java runtime on this machine, so the panel can warn before a server fails to start.
-	mux.HandleFunc("GET /java", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, detectJava())
-	})
-}
-
-type javaInfo struct {
-	Found   bool   `json:"found"`
-	Version string `json:"version"`
-	Major   int    `json:"major"`
-}
-
-var javaVersion = regexp.MustCompile(`version "([^"]+)"`)
-
-func detectJava() javaInfo {
-	out, err := exec.Command("java", "-version").CombinedOutput()
-	if err != nil {
-		return javaInfo{}
-	}
-	match := javaVersion.FindSubmatch(out)
-	if match == nil {
-		return javaInfo{}
-	}
-	version := string(match[1])
-	parts := strings.Split(version, ".")
-	major, _ := strconv.Atoi(parts[0])
-	if major == 1 && len(parts) > 1 { // Java 8 calls itself 1.8
-		major, _ = strconv.Atoi(parts[1])
-	}
-	return javaInfo{Found: true, Version: version, Major: major}
 }

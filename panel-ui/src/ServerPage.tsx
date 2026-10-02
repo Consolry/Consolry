@@ -3,16 +3,18 @@ import { api, stateLabel, uptime, type Finding, type PowerAction, type ServerInf
 import Backups from "./Backups";
 import Console from "./Console";
 import Files from "./Files";
+import Players from "./Players";
 import Plugins from "./Plugins";
+import Schedules from "./Schedules";
+import Settings from "./Settings";
 import { ErrorNote, useAction } from "./ui";
 
-export type Tab = "console" | "files" | "plugins" | "backups";
+export type Tab = "console" | "files" | "plugins" | "players" | "backups" | "schedules" | "settings";
 
 type Props = { server: ServerInfo; tab: Tab; now: number; onChanged: () => void; onDeleted: () => void };
 
 export default function ServerPage({ server, tab, now, onChanged, onDeleted }: Props) {
   const { error, run } = useAction();
-  const [confirming, setConfirming] = useState(false);
   const running = server.state === "running";
   const live = running || server.state === "stopping";
   const minecraft = server.kind === "minecraft";
@@ -21,8 +23,15 @@ export default function ServerPage({ server, tab, now, onChanged, onDeleted }: P
   const tabs: { id: Tab; label: string }[] = [
     { id: "console", label: "Console" },
     { id: "files", label: "Files" },
-    ...(minecraft ? [{ id: "plugins" as Tab, label: server.software === "fabric" ? "Mods" : "Plugins" }] : []),
+    ...(minecraft
+      ? [
+          { id: "plugins" as Tab, label: server.software === "fabric" ? "Mods" : "Plugins" },
+          { id: "players" as Tab, label: "Players" },
+        ]
+      : []),
     { id: "backups", label: "Backups" },
+    { id: "schedules", label: "Schedules" },
+    { id: "settings", label: "Settings" },
   ];
   const current = tabs.some((item) => item.id === tab) ? tab : "console";
 
@@ -78,26 +87,14 @@ export default function ServerPage({ server, tab, now, onChanged, onDeleted }: P
           </dl>
           <Diagnosis server={server} />
           <Console serverId={server.id} running={running} />
-          <footer className="remove">
-            {confirming ? (
-              <>
-                <span>Remove {server.name} from the panel? Its files stay on the node.</span>
-                <button className="danger" onClick={() => run("remove", () => api.deleteServer(server.id), onDeleted)}>
-                  Remove
-                </button>
-                <button onClick={() => setConfirming(false)}>Cancel</button>
-              </>
-            ) : (
-              <button className="small" disabled={live} onClick={() => setConfirming(true)} title={live ? "Stop the server first" : undefined}>
-                Remove server
-              </button>
-            )}
-          </footer>
         </>
       )}
       {current === "files" && <Files serverId={server.id} />}
       {current === "plugins" && <Plugins server={server} />}
+      {current === "players" && <Players server={server} />}
       {current === "backups" && <Backups server={server} />}
+      {current === "schedules" && <Schedules server={server} />}
+      {current === "settings" && <Settings server={server} onChanged={onChanged} onDeleted={onDeleted} />}
     </>
   );
 }
