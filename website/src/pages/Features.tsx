@@ -1,4 +1,4 @@
-import { Compare, Platforms } from "../components/Blocks";
+import { Architecture, Compare, Platforms, Stack, Support } from "../components/Blocks";
 import { PageHead, Section } from "../components/Layout";
 import { AppWindow, views } from "../components/Showcase";
 import { audiences, basics } from "../content";
@@ -44,7 +44,22 @@ export default function Features() {
         </dl>
       </Section>
 
-      <Section alt label="Before and after" title="The same five jobs, without the chores">
+      <Section
+        alt
+        label="Under the hood"
+        title="How it's built"
+        intro="This is the design the first release is being built to."
+      >
+        <Architecture />
+        <h3 className="sub">The stack</h3>
+        <Stack />
+      </Section>
+
+      <Section label="Supported" title="What works in the first release, and what follows">
+        <Support />
+      </Section>
+
+      <Section alt label="Day to day" title="What changes for the person running the server">
         <Compare />
       </Section>
 

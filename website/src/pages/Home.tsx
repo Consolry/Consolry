@@ -1,7 +1,7 @@
-import { Compare, HeroCard, Platforms } from "../components/Blocks";
+import { Architecture, HeroCard, Platforms, Support } from "../components/Blocks";
 import { Clouds, Section } from "../components/Layout";
 import Showcase from "../components/Showcase";
-import { checks, problems } from "../content";
+import { checks, problems, site } from "../content";
 
 export default function Home() {
   return (
@@ -24,6 +24,9 @@ export default function Home() {
               </a>
               <a href="/features" className="button ghost">
                 See the features
+              </a>
+              <a href={site.github} className="source-link">
+                Source on GitHub
               </a>
             </div>
             <ul className="checks">
@@ -64,13 +67,13 @@ export default function Home() {
 
       <Section
         alt
-        label="Before and after"
-        title="The same jobs, without the chores"
-        intro="Nothing here is new work. It is the work you already do, with the panel doing the tedious half."
+        label="Architecture"
+        title="One panel, one daemon per machine"
+        intro="The panel is a single Go binary. Each machine that hosts servers runs a small daemon, which the panel controls over HTTPS and WebSocket."
       >
-        <Compare limit={3} />
+        <Architecture />
         <p className="more">
-          <a href="/features">See all five</a>
+          <a href="/features">The full stack</a>
         </p>
       </Section>
 
@@ -80,6 +83,8 @@ export default function Home() {
         intro="One program for the panel and one for each machine that hosts servers. Mix Windows and Linux machines in the same panel."
       >
         <Platforms />
+        <h3 className="sub">What's supported</h3>
+        <Support />
       </Section>
 
       <section className="section alt">

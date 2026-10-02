@@ -1,4 +1,77 @@
-import { comparisons, platforms } from "../content";
+import { comparisons, platforms, stack, support } from "../content";
+
+export function Architecture() {
+  return (
+    <div
+      className="arch"
+      role="img"
+      aria-label="Your browser talks to the panel over HTTPS and WebSocket. The panel stores data in SQLite or PostgreSQL and talks to one daemon on each machine. On Linux the daemon runs each server in a container; on Windows it runs each server as a process."
+    >
+      <div className="arch-node">
+        <p className="pixel">You</p>
+        <h3>Browser</h3>
+        <p>The React interface, or your own scripts through the API.</p>
+      </div>
+      <p className="arch-link">HTTPS + WebSocket</p>
+      <div className="arch-node main">
+        <p className="pixel">One binary</p>
+        <h3>Panel</h3>
+        <p>Users, roles, schedules, backups and the game modules.</p>
+        <p className="arch-db">SQLite or PostgreSQL</p>
+      </div>
+      <p className="arch-link">HTTPS + WebSocket</p>
+      <div className="arch-group">
+        <p className="pixel">Daemon, one per machine</p>
+        <div className="arch-node">
+          <h3>Linux</h3>
+          <p>Each server in its own container.</p>
+        </div>
+        <div className="arch-node">
+          <h3>Windows</h3>
+          <p>Each server as a normal process.</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function Stack() {
+  return (
+    <table className="table spec">
+      <tbody>
+        {stack.map((row) => (
+          <tr key={row.part}>
+            <th scope="row">{row.part}</th>
+            <td>{row.detail}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+export function Support() {
+  return (
+    <table className="table">
+      <thead>
+        <tr>
+          <th scope="col">Area</th>
+          <th scope="col">First release</th>
+          <th scope="col">After</th>
+        </tr>
+      </thead>
+      <tbody>
+        {support.map((row) => (
+          <tr key={row.area}>
+            <th scope="row">{row.area}</th>
+            <td>{row.first}</td>
+            <td>{row.later}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
 
 export function Compare({ limit }: { limit?: number }) {
   return (

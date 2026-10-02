@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { routes } from "../content";
+import { routes, site } from "../content";
 import Waitlist from "./Waitlist";
 
 function Logo() {
@@ -24,8 +24,8 @@ export default function Layout({ path, children }: { path: string; children: Rea
       </a>
 
       <p className="announce">
-        <span className="pixel">In development</span>
-        Nothing is released yet. <a href="#waitlist">Get one email when it is</a>
+        <span className="pixel">Pre-release</span>
+        Consolry is being built in the open. <a href={site.github}>Follow on GitHub</a>
       </p>
 
       <header className="site-header">
@@ -37,6 +37,7 @@ export default function Layout({ path, children }: { path: string; children: Rea
                 {route.nav}
               </a>
             ))}
+            <a href={site.github}>GitHub</a>
           </nav>
           <a href="#waitlist" className="button small">
             Join the waitlist
@@ -61,7 +62,10 @@ export default function Layout({ path, children }: { path: string; children: Rea
         <div className="wrap">
           <div>
             <Logo />
-            <p>A game server panel that knows your game.</p>
+            <p>An open source game server panel, licensed AGPL-3.0.</p>
+            <p>
+              Maintained by <a href={site.maintainer.url}>{site.maintainer.name}</a>
+            </p>
           </div>
           <nav aria-label="Footer">
             <a href="/">Home</a>
@@ -70,9 +74,11 @@ export default function Layout({ path, children }: { path: string; children: Rea
                 {route.nav}
               </a>
             ))}
+            <a href={site.github}>Source code</a>
+            <a href={`${site.github}/issues`}>Issues</a>
           </nav>
           <p className="legal">
-            © 2026 Consolry. Not affiliated with Mojang or Microsoft. Minecraft is a trademark of Mojang AB.
+            © 2026 {site.maintainer.name} and Consolry contributors. Not affiliated with Mojang or Microsoft. Minecraft is a trademark of Mojang AB.
           </p>
         </div>
       </footer>

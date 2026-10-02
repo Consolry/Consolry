@@ -156,27 +156,54 @@ function VersionsView() {
   );
 }
 
+function Spark({ points }: { points: string }) {
+  return (
+    <svg className="spark" viewBox="0 0 100 22" preserveAspectRatio="none">
+      <polyline points={points} />
+    </svg>
+  );
+}
+
 function ConsoleView() {
   return (
     <div className="console">
       <dl className="console-stats">
         <div>
-          <dt>Players</dt>
-          <dd>12 / 40</dd>
-        </div>
-        <div>
-          <dt>Ticks per second</dt>
-          <dd>19.9</dd>
+          <dt>CPU</dt>
+          <dd>
+            34% <small>of 4 cores</small>
+          </dd>
+          <Spark points="0,16 9,14 18,17 27,12 36,13 45,9 54,12 63,6 72,10 81,8 90,12 100,9" />
         </div>
         <div>
           <dt>Memory</dt>
-          <dd>3.1 of 6 GB</dd>
+          <dd>
+            3.1 <small>of 6 GB</small>
+          </dd>
+          <Spark points="0,15 9,15 18,14 27,13 36,13 45,12 54,12 63,11 72,11 81,10 90,10 100,10" />
         </div>
         <div>
-          <dt>Uptime</dt>
-          <dd>6 d 4 h</dd>
+          <dt>Ticks per second</dt>
+          <dd>
+            19.9 <small>of 20</small>
+          </dd>
+          <Spark points="0,4 9,4 18,5 27,4 36,4 45,4 54,13 63,6 72,4 81,4 90,5 100,4" />
+        </div>
+        <div>
+          <dt>Network</dt>
+          <dd>
+            1.2 <small>MB/s out</small>
+          </dd>
+          <Spark points="0,18 9,15 18,16 27,11 36,14 45,10 54,12 63,7 72,9 81,11 90,6 100,8" />
         </div>
       </dl>
+      <p className="console-meta">
+        <span>12 / 40 players</span>
+        <span>0.0.0.0:25565/tcp</span>
+        <span>Disk 4.2 of 20 GB</span>
+        <span>Up 6 d 4 h</span>
+        <span>Last backup 18:43</span>
+      </p>
       <pre className="log">
         <span>[18:40:02 INFO]: Mossy_Kat joined the game</span>
         <span>[18:40:31 INFO]: &lt;Mossy_Kat&gt; anyone at spawn?</span>
@@ -265,20 +292,37 @@ export default function Showcase() {
       <div id="showcase-panel" role="tabpanel" aria-labelledby={`tab-${view.id}`}>
         <AppWindow viewId={view.id}>{view.body}</AppWindow>
       </div>
-      <p className="showcase-note">A design mock-up. The panel is still being built, so details will change.</p>
     </div>
   );
 }
+
+const appTabs = ["Console", "Files", "Plugins", "Config", "Versions", "Backups", "Schedules", "Users"];
+const activeTab: Record<string, string> = {
+  plugins: "Plugins",
+  crash: "Console",
+  config: "Config",
+  versions: "Versions",
+  console: "Console",
+};
 
 export function AppWindow({ viewId, children }: { viewId: string; children: ReactNode }) {
   const selected = viewId === "crash" ? "modded" : "survival";
   return (
     <div className="app">
-      <div className="app-chrome">
-        <i />
-        <i />
-        <i />
-        <span>panel.yourserver.net</span>
+      <div className="app-bar">
+        <strong>Consolry</strong>
+        <span>
+          Servers / <b>{selected}</b>
+        </span>
+        <span className="app-node">node-01 · Linux · 25565/tcp</span>
+        <span className="app-tag">Preview</span>
+      </div>
+      <div className="app-tabs">
+        {appTabs.map((tab) => (
+          <span key={tab} className={tab === activeTab[viewId] ? "on" : undefined}>
+            {tab}
+          </span>
+        ))}
       </div>
       <div className="app-body">
         <aside className="app-side">

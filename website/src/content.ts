@@ -3,7 +3,28 @@ export const site = {
   name: "Consolry",
   // The Buttondown account name, from buttondown.com/<name>. Empty means the waitlist is closed.
   buttondownUsername: "",
+  github: "https://github.com/DinoNaedYT/Consolry",
+  maintainer: { name: "DinoNaedYT", url: "https://github.com/DinoNaedYT" },
 };
+
+export const stack = [
+  { part: "Panel", detail: "Go, shipped as one binary with the React interface embedded. REST API with scoped keys." },
+  { part: "Database", detail: "SQLite by default, so a home install is a single file. PostgreSQL for larger installs." },
+  { part: "Daemon", detail: "Go, one per machine that hosts servers. Talks to the panel over HTTPS, with WebSocket for the live console." },
+  { part: "Isolation on Linux", detail: "Each server runs in its own Docker container, with CPU, memory and disk limits." },
+  { part: "Isolation on Windows", detail: "Each server runs as a normal process. Meant for your own servers, not for untrusted customers." },
+  { part: "Game modules", detail: "Compiled into the panel. Minecraft is the first; the same interface becomes the public SDK." },
+  { part: "Licence", detail: "AGPL-3.0 for the core. Paid features ship as separate modules." },
+];
+
+export const support = [
+  { area: "Server software", first: "Paper, Purpur, Fabric, NeoForge", later: "Forge, Velocity and BungeeCord proxies" },
+  { area: "Plugin and mod sources", first: "Modrinth, Hangar, CurseForge", later: "Manual upload for everything else, including SpigotMC" },
+  { area: "Backup targets", first: "Local disk, S3-compatible storage", later: "Retention rules, single-file restore" },
+  { area: "Operating systems", first: "Windows, Linux", later: "macOS, ARM" },
+  { area: "Databases", first: "SQLite, PostgreSQL", later: "" },
+  { area: "Login", first: "Password, two-factor, single sign-on", later: "Passkeys" },
+];
 
 export const routes = [
   {
