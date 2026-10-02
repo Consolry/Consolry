@@ -510,6 +510,15 @@ func (a *App) handlePower(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// Minecraft servers made before the Java requirement was recorded get it filled in here,
+	// which is also what lets the daemon tell "starting" from "running".
+	if input.Action == "start" && row.Kind == "minecraft" {
+		if spec, err := serverState(r.Context(), node, row.ID); err == nil && spec.Java == 0 && spec.Command == "java" && spec.State != "running" {
+			spec.Java = minecraft.JavaFor(r.Context(), row.MCVersion)
+			spec.State, spec.StartedAt, spec.CPU, spec.Memory, spec.Progress = "", 0, 0, 0, ""
+			_ = node.call(r.Context(), http.MethodPut, "/servers/"+row.ID, spec, nil)
+		}
+	}
 	var result map[string]string
 	if err := node.call(r.Context(), http.MethodPost, "/servers/"+row.ID+"/"+input.Action, nil, &result); err != nil {
 		writeError(w, http.StatusConflict, err.Error())

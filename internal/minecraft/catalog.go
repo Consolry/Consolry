@@ -164,9 +164,9 @@ func Versions(ctx context.Context, software string) ([]string, error) {
 	return nil, errors.New("unknown server software")
 }
 
-// javaFor returns the oldest Java that can run a Minecraft version. Paper publishes this;
+// JavaFor returns the oldest Java that can run a Minecraft version. Paper publishes this;
 // when it has no entry for the version, fall back to the known cut-offs.
-func javaFor(ctx context.Context, version string) int {
+func JavaFor(ctx context.Context, version string) int {
 	var reply struct {
 		Version struct {
 			Java struct {
@@ -235,9 +235,9 @@ func Resolve(ctx context.Context, software, version string) (Download, error) {
 		if !ok || file.URL == "" {
 			return Download{}, errors.New("Paper has no download for that version")
 		}
-		return Download{URL: file.URL, SHA256: file.Checksums.SHA256, JavaMin: javaFor(ctx, version)}, nil
+		return Download{URL: file.URL, SHA256: file.Checksums.SHA256, JavaMin: JavaFor(ctx, version)}, nil
 	case "purpur":
-		return Download{URL: "https://api.purpurmc.org/v2/purpur/" + version + "/latest/download", JavaMin: javaFor(ctx, version)}, nil
+		return Download{URL: "https://api.purpurmc.org/v2/purpur/" + version + "/latest/download", JavaMin: JavaFor(ctx, version)}, nil
 	case "fabric":
 		var loaders, installers []struct {
 			Version string `json:"version"`
@@ -269,7 +269,7 @@ func Resolve(ctx context.Context, software, version string) (Download, error) {
 		}
 		return Download{
 			URL:     "https://meta.fabricmc.net/v2/versions/loader/" + version + "/" + loader + "/" + installer + "/server/jar",
-			JavaMin: javaFor(ctx, version),
+			JavaMin: JavaFor(ctx, version),
 		}, nil
 	}
 	return Download{}, errors.New("unknown server software")
