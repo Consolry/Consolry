@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { consoleSocket } from "./api";
+import { colourLine, pluginHealth } from "./colour";
 
 const maxLines = 2000;
 
@@ -113,7 +114,21 @@ export default function Console({ serverId, running }: { serverId: string; runni
   }
 
   const needle = filter.trim().toLowerCase();
-  const shown = needle ? lines.filter((line) => line.toLowerCase().includes(needle)) : lines;
+
+  // Colour every line. A line with no timestamp (a stack trace) takes the level of the line above it,
+  // so the levels are worked out over the whole log before any search filter is applied.
+  const rendered = useMemo(() => {
+    const health = pluginHealth(lines);
+    let level: ReturnType<typeof colourLine>["level"] = "";
+    const out: { text: string; node: ReactNode }[] = [];
+    for (const text of lines) {
+      const result = colourLine(text, health, level);
+      level = result.level;
+      out.push({ text, node: result.node });
+    }
+    return out;
+  }, [lines]);
+  const shown = needle ? rendered.filter((line) => line.text.toLowerCase().includes(needle)) : rendered;
 
   return (
     <section className="console" aria-label="Console">
@@ -138,8 +153,9 @@ export default function Console({ serverId, running }: { serverId: string; runni
             <span className="dim">No lines contain "{filter}".</span>
           ) : (
             shown.map((line, index) => (
-              <span key={index} className={lineClass(line)}>
-                {line + "\n"}
+              <span key={index}>
+                {line.node}
+                {"\n"}
               </span>
             ))
           )}
@@ -165,11 +181,4 @@ export default function Console({ serverId, running }: { serverId: string; runni
       </div>
     </section>
   );
-}
-
-function lineClass(line: string) {
-  if (line.startsWith("[consolry]")) return "system";
-  if (/\b(ERROR|SEVERE|FATAL)\b|Exception/.test(line)) return "bad";
-  if (/\bWARN(ING)?\b/.test(line)) return "warn";
-  return undefined;
 }

@@ -1633,3 +1633,101 @@ pre.command {
   flex: 1;
   min-width: 0;
 }
+
+/* Console colours */
+
+.console pre {
+  --c-cyan: #6fe0e6;
+  --c-violet: #c4a7ff;
+  color: #d5dfec;
+}
+
+.c-time {
+  color: #5f7691;
+}
+
+.c-level {
+  color: var(--accent);
+}
+
+.c-level.l-warn {
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.c-level.l-error {
+  color: var(--bad);
+  font-weight: 600;
+}
+
+.c-tag {
+  font-weight: 600;
+}
+
+.c-tag.plain {
+  color: var(--c-cyan);
+  font-weight: 400;
+}
+
+.c-tag.ok {
+  color: var(--ok);
+}
+
+.c-tag.warn {
+  color: var(--warn);
+}
+
+.c-tag.bad {
+  color: var(--bad);
+}
+
+.c-tag.off {
+  color: #7d8ea3;
+}
+
+.c-system {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.c-error,
+.c-trace {
+  color: #ff9a9a;
+}
+
+.c-trace {
+  opacity: 0.8;
+}
+
+.c-warn {
+  color: #f6d68a;
+}
+
+.c-done {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.c-good {
+  color: #a9e8b2;
+}
+
+.c-join {
+  color: var(--ok);
+}
+
+.c-leave {
+  color: var(--warn);
+}
+
+.c-chat {
+  color: #ffffff;
+}
+
+.c-command {
+  color: var(--c-violet);
+}
+
+.c-muted {
+  color: #8496ab;
+}
