@@ -81,6 +81,8 @@ type User struct {
 	ServerLimit int `json:"serverLimit"`
 	// MemoryLimitMB is the most memory this account may give one of its servers.
 	MemoryLimitMB int `json:"memoryLimitMb"`
+	// TwoFactor is true when signing in also needs a code from an authenticator app.
+	TwoFactor bool `json:"twoFactor"`
 }
 
 type Node struct {
@@ -122,6 +124,8 @@ func OpenStore(path string) (*Store, error) {
 		"users ADD COLUMN admin INTEGER NOT NULL DEFAULT 0",
 		"users ADD COLUMN server_limit INTEGER NOT NULL DEFAULT 0",
 		"users ADD COLUMN memory_limit_mb INTEGER NOT NULL DEFAULT 4096",
+		"users ADD COLUMN totp_secret TEXT NOT NULL DEFAULT ''",
+		"users ADD COLUMN recovery_codes TEXT NOT NULL DEFAULT ''",
 	} {
 		if _, err := db.Exec("ALTER TABLE " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			db.Close()
@@ -173,8 +177,8 @@ var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("consolry"), bcrypt.Defaul
 func (s *Store) CheckPassword(username, password string) (User, error) {
 	var user User
 	var hash string
-	err := s.db.QueryRow(`SELECT id, username, admin, server_limit, memory_limit_mb, password_hash FROM users WHERE username = ? COLLATE NOCASE`, username).
-		Scan(&user.ID, &user.Username, &user.Admin, &user.ServerLimit, &user.MemoryLimitMB, &hash)
+	err := s.db.QueryRow(`SELECT id, username, admin, server_limit, memory_limit_mb, totp_secret != '', password_hash FROM users WHERE username = ? COLLATE NOCASE`, username).
+		Scan(&user.ID, &user.Username, &user.Admin, &user.ServerLimit, &user.MemoryLimitMB, &user.TwoFactor, &hash)
 	if errors.Is(err, sql.ErrNoRows) {
 		// Hash anyway so a wrong username takes as long as a wrong password.
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
@@ -209,10 +213,10 @@ func (s *Store) NewSession(userID int64) (string, error) {
 func (s *Store) SessionUser(token string) (User, error) {
 	var user User
 	err := s.db.QueryRow(`
-		SELECT users.id, users.username, users.admin, users.server_limit, users.memory_limit_mb FROM sessions
+		SELECT users.id, users.username, users.admin, users.server_limit, users.memory_limit_mb, users.totp_secret != '' FROM sessions
 		JOIN users ON users.id = sessions.user_id
 		WHERE sessions.token_hash = ? AND sessions.expires_at > ?`,
-		hashToken(token), time.Now().Unix()).Scan(&user.ID, &user.Username, &user.Admin, &user.ServerLimit, &user.MemoryLimitMB)
+		hashToken(token), time.Now().Unix()).Scan(&user.ID, &user.Username, &user.Admin, &user.ServerLimit, &user.MemoryLimitMB, &user.TwoFactor)
 	return user, err
 }
 

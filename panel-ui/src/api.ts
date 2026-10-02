@@ -4,7 +4,9 @@ export type Limits = {
   /** The most memory the account may give one server. */
   memoryLimitMb: number;
 };
-export type User = { id: number; username: string; admin: boolean } & Limits;
+export type User = { id: number; username: string; admin: boolean; twoFactor: boolean } & Limits;
+/** A sign-in answer: either the account, or a request for the code from an authenticator app. */
+export type LoginResult = User | { twoFactor: true; ticket: string };
 export type Account = User & { servers: number };
 export type UpdateStatus = { current: string; latest: string; available: boolean; notes: string; problem: string };
 export type PanelState = { setupNeeded: boolean; version: string; user: User | null; signupAllowed: boolean };
@@ -147,7 +149,14 @@ const node = (id: string) => `/servers/${id}/node`;
 export const api = {
   state: () => request<PanelState>("GET", "/state"),
   setup: (username: string, password: string) => request<User>("POST", "/setup", { username, password }),
-  login: (username: string, password: string) => request<User>("POST", "/login", { username, password }),
+  login: (username: string, password: string) => request<LoginResult>("POST", "/login", { username, password }),
+  loginCode: (ticket: string, code: string) => request<User>("POST", "/login/code", { ticket, code }),
+  changePassword: (current: string, next: string) => request<void>("POST", "/account/password", { current, new: next }),
+  startTwoFactor: () => request<{ secret: string; qr: string }>("POST", "/account/two-factor/start", {}),
+  enableTwoFactor: (secret: string, code: string) => request<{ recoveryCodes: string[] }>("POST", "/account/two-factor", { secret, code }),
+  disableTwoFactor: (password: string) => request<void>("DELETE", "/account/two-factor", { password }),
+  resetAccount: (userId: number, password: string, clearTwoFactor: boolean) =>
+    request<void>("POST", `/accounts/${userId}/reset`, { password, clearTwoFactor }),
   signup: (username: string, password: string) => request<User>("POST", "/signup", { username, password }),
   logout: () => request<void>("POST", "/logout", {}),
 

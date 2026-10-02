@@ -46,6 +46,12 @@ func (a *App) Handler() http.Handler {
 	mux.HandleFunc("POST /api/setup", a.handleSetup)
 	mux.HandleFunc("POST /api/login", a.handleLogin)
 	mux.HandleFunc("POST /api/signup", a.handleSignup)
+	mux.HandleFunc("POST /api/login/code", a.handleLoginCode)
+	mux.Handle("POST /api/account/password", a.authed(a.handleChangePassword))
+	mux.Handle("POST /api/account/two-factor/start", a.authed(a.handleStartTwoFactor))
+	mux.Handle("POST /api/account/two-factor", a.authed(a.handleEnableTwoFactor))
+	mux.Handle("DELETE /api/account/two-factor", a.authed(a.handleDisableTwoFactor))
+	mux.Handle("POST /api/accounts/{uid}/reset", a.admin(a.handleResetAccount))
 	mux.HandleFunc("POST /api/logout", a.handleLogout)
 
 	mux.Handle("GET /api/nodes", a.admin(a.handleNodes))
@@ -251,6 +257,16 @@ func (a *App) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if user.TwoFactor {
+		// The password was right; the code from the authenticator app comes next.
+		ticket, err := newPendingLogin(user.ID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"twoFactor": true, "ticket": ticket})
 		return
 	}
 	logins.clear(from)

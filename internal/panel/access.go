@@ -98,8 +98,8 @@ func (s *Store) RemoveMember(serverID string, userID int64) error {
 
 func (s *Store) UserByName(username string) (User, error) {
 	var user User
-	err := s.db.QueryRow(`SELECT id, username, admin, server_limit, memory_limit_mb FROM users WHERE username = ? COLLATE NOCASE`, username).
-		Scan(&user.ID, &user.Username, &user.Admin, &user.ServerLimit, &user.MemoryLimitMB)
+	err := s.db.QueryRow(`SELECT id, username, admin, server_limit, memory_limit_mb, totp_secret != '' FROM users WHERE username = ? COLLATE NOCASE`, username).
+		Scan(&user.ID, &user.Username, &user.Admin, &user.ServerLimit, &user.MemoryLimitMB, &user.TwoFactor)
 	return user, err
 }
 

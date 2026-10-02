@@ -37,6 +37,10 @@ function LimitFields({ value, onChange }: { value: Limits; onChange: (next: Limi
 function Row({ account, onChanged }: { account: Account; onChanged: () => void }) {
   const [limits, setLimits] = useState<Limits>({ serverLimit: account.serverLimit, memoryLimitMb: account.memoryLimitMb });
   const [confirming, setConfirming] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const [password, setPassword] = useState("");
+  const [clearTwoFactor, setClearTwoFactor] = useState(false);
+  const [reset, setReset] = useState(false);
   const { error, busy, run } = useAction();
   const changed = limits.serverLimit !== account.serverLimit || limits.memoryLimitMb !== account.memoryLimitMb;
 
@@ -48,7 +52,13 @@ function Row({ account, onChanged }: { account: Account; onChanged: () => void }
           {account.admin
             ? "Admin · manages the panel and can create any number of servers"
             : `Owns ${account.servers} ${account.servers === 1 ? "server" : "servers"}`}
+          {account.twoFactor && " · two-factor on"}
         </span>
+        {!account.admin && !resetting && (
+          <button className="small" onClick={() => setResetting(true)}>
+            Locked out?
+          </button>
+        )}
         {!account.admin &&
           (confirming ? (
             <>
@@ -66,6 +76,38 @@ function Row({ account, onChanged }: { account: Account; onChanged: () => void }
           ))}
       </div>
       {confirming && <p className="dim">Their servers are kept and pass to you. This cannot be undone.</p>}
+      {resetting && (
+        <form
+          className="limits"
+          onSubmit={(event) => {
+            event.preventDefault();
+            run("reset", () => api.resetAccount(account.id, password, clearTwoFactor), () => {
+              setResetting(false);
+              setPassword("");
+              setReset(true);
+              onChanged();
+            });
+          }}
+        >
+          <label>
+            New password for them
+            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} minLength={10} autoComplete="new-password" />
+          </label>
+          {account.twoFactor && (
+            <label className="check">
+              <input type="checkbox" checked={clearTwoFactor} onChange={(event) => setClearTwoFactor(event.target.checked)} />
+              <span>Switch off their two-factor login</span>
+            </label>
+          )}
+          <button className="small primary" disabled={busy !== "" || (!password && !clearTwoFactor)}>
+            Reset
+          </button>
+          <button type="button" className="small" onClick={() => setResetting(false)}>
+            Cancel
+          </button>
+        </form>
+      )}
+      {reset && <p className="note">Done. They are signed out everywhere; give them the new password in person or by message.</p>}
       {!account.admin && (
         <div className="limits">
           <LimitFields value={limits} onChange={setLimits} />

@@ -22,7 +22,7 @@ const (
 
 func (s *Store) Accounts() ([]Account, error) {
 	rows, err := s.db.Query(`
-		SELECT users.id, users.username, users.admin, users.server_limit, users.memory_limit_mb,
+		SELECT users.id, users.username, users.admin, users.server_limit, users.memory_limit_mb, users.totp_secret != '',
 			(SELECT COUNT(*) FROM servers WHERE servers.owner_id = users.id)
 		FROM users ORDER BY users.admin DESC, users.username`)
 	if err != nil {
@@ -32,7 +32,7 @@ func (s *Store) Accounts() ([]Account, error) {
 	accounts := []Account{}
 	for rows.Next() {
 		var account Account
-		if err := rows.Scan(&account.ID, &account.Username, &account.Admin, &account.ServerLimit, &account.MemoryLimitMB, &account.Servers); err != nil {
+		if err := rows.Scan(&account.ID, &account.Username, &account.Admin, &account.ServerLimit, &account.MemoryLimitMB, &account.TwoFactor, &account.Servers); err != nil {
 			return nil, err
 		}
 		accounts = append(accounts, account)
@@ -42,8 +42,8 @@ func (s *Store) Accounts() ([]Account, error) {
 
 func (s *Store) UserByID(id int64) (User, error) {
 	var user User
-	err := s.db.QueryRow(`SELECT id, username, admin, server_limit, memory_limit_mb FROM users WHERE id = ?`, id).
-		Scan(&user.ID, &user.Username, &user.Admin, &user.ServerLimit, &user.MemoryLimitMB)
+	err := s.db.QueryRow(`SELECT id, username, admin, server_limit, memory_limit_mb, totp_secret != '' FROM users WHERE id = ?`, id).
+		Scan(&user.ID, &user.Username, &user.Admin, &user.ServerLimit, &user.MemoryLimitMB, &user.TwoFactor)
 	return user, err
 }
 

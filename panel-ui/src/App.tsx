@@ -1,23 +1,53 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import Access from "./Access";
+import Account from "./Account";
 import Accounts from "./Accounts";
-import { api, isLive, stateLabel, uptime, type NodeInfo, type PanelState, type ServerInfo, type User } from "./api";
+import {
+  api,
+  isLive,
+  stateLabel,
+  uptime,
+  type NodeInfo,
+  type PanelState,
+  type ServerInfo,
+  type User,
+} from "./api";
 import NewServer from "./NewServer";
 import type { UsageHistory } from "./Dashboard";
 import ServerPage, { type Tab } from "./ServerPage";
 import { Empty, ErrorNote, useAction } from "./ui";
 import UpdateBanner from "./Update";
 
-type View = { kind: "overview" } | { kind: "server"; id: string; tab: Tab } | { kind: "new-server" } | { kind: "nodes" } | { kind: "access" } | { kind: "accounts" };
+type View =
+  | { kind: "overview" }
+  | { kind: "server"; id: string; tab: Tab }
+  | { kind: "new-server" }
+  | { kind: "nodes" }
+  | { kind: "access" }
+  | { kind: "accounts" }
+  | { kind: "account" };
 
 // The address after # decides the page, so a refresh or a shared link lands in the same place.
 function parseHash(hash: string): View {
   const parts = hash.replace(/^#\/?/, "").split("/");
-  if (parts[0] === "servers" && parts[1]) return { kind: "server", id: parts[1], tab: (parts[2] || "dashboard") as Tab };
+  if (parts[0] === "servers" && parts[1])
+    return {
+      kind: "server",
+      id: parts[1],
+      tab: (parts[2] || "dashboard") as Tab,
+    };
   if (parts[0] === "new") return { kind: "new-server" };
   if (parts[0] === "nodes") return { kind: "nodes" };
   if (parts[0] === "access") return { kind: "access" };
   if (parts[0] === "accounts") return { kind: "accounts" };
+  if (parts[0] === "account") return { kind: "account" };
   return { kind: "overview" };
 }
 
@@ -52,14 +82,24 @@ export default function App() {
   if (failed) {
     return (
       <Centered title="Can't reach the panel">
-        <p className="dim">Check that the Consolry panel is running, then reload.</p>
+        <p className="dim">
+          Check that the Consolry panel is running, then reload.
+        </p>
       </Centered>
     );
   }
   if (!state) return null;
   if (state.setupNeeded) return <AuthForm mode="setup" onDone={refresh} />;
-  if (!state.user) return <SignedOut signupAllowed={state.signupAllowed} onDone={refresh} />;
-  return <Panel user={state.user} version={state.version} onSignOut={() => api.logout().then(refresh)} />;
+  if (!state.user)
+    return <SignedOut signupAllowed={state.signupAllowed} onDone={refresh} />;
+  return (
+    <Panel
+      user={state.user}
+      version={state.version}
+      onSignOut={() => api.logout().then(refresh)}
+      onAccountChanged={refresh}
+    />
+  );
 }
 
 function Logo() {
@@ -67,7 +107,10 @@ function Logo() {
     <span className="logo">
       <svg viewBox="0 0 32 32" aria-hidden="true" shapeRendering="crispEdges">
         <path className="logo-block" d="M4 0h24v4h4v24h-4v4H4v-4H0V4h4z" />
-        <path className="logo-mark" d="M8 10h4v4h4v4h-4v4H8v-4h4v-4H8zM18 18h8v4h-8z" />
+        <path
+          className="logo-mark"
+          d="M8 10h4v4h4v4h-4v4H8v-4h4v-4H8zM18 18h8v4h-8z"
+        />
       </svg>
       Consolry
     </span>
@@ -88,7 +131,13 @@ function Centered({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /** The sign-in page and the sign-up page, at #/login and #/signup. */
-function SignedOut({ signupAllowed, onDone }: { signupAllowed: boolean; onDone: () => void }) {
+function SignedOut({
+  signupAllowed,
+  onDone,
+}: {
+  signupAllowed: boolean;
+  onDone: () => void;
+}) {
   const [hash, setHash] = useState(location.hash);
   useEffect(() => {
     const onChange = () => setHash(location.hash);
@@ -101,7 +150,11 @@ function SignedOut({ signupAllowed, onDone }: { signupAllowed: boolean; onDone: 
     onDone();
   };
   return (
-    <AuthForm key={signup ? "signup" : "login"} mode={signup ? "signup" : "login"} onDone={done}>
+    <AuthForm
+      key={signup ? "signup" : "login"}
+      mode={signup ? "signup" : "login"}
+      onDone={done}
+    >
       {signupAllowed &&
         (signup ? (
           <p className="dim switch">
@@ -116,11 +169,22 @@ function SignedOut({ signupAllowed, onDone }: { signupAllowed: boolean; onDone: 
   );
 }
 
-function AuthForm({ mode, onDone, children }: { mode: "setup" | "login" | "signup"; onDone: () => void; children?: ReactNode }) {
+function AuthForm({
+  mode,
+  onDone,
+  children,
+}: {
+  mode: "setup" | "login" | "signup";
+  onDone: () => void;
+  children?: ReactNode;
+}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  // Set when the password was right and the account also needs a code from an authenticator app.
+  const [ticket, setTicket] = useState("");
+  const [code, setCode] = useState("");
   const setup = mode === "setup";
   const creating = mode !== "login";
 
@@ -129,7 +193,20 @@ function AuthForm({ mode, onDone, children }: { mode: "setup" | "login" | "signu
     setBusy(true);
     setError("");
     try {
-      await (setup ? api.setup(username, password) : mode === "signup" ? api.signup(username, password) : api.login(username, password));
+      if (ticket) {
+        await api.loginCode(ticket, code);
+      } else if (setup) {
+        await api.setup(username, password);
+      } else if (mode === "signup") {
+        await api.signup(username, password);
+      } else {
+        const result = await api.login(username, password);
+        if ("ticket" in result) {
+          setTicket(result.ticket);
+          setBusy(false);
+          return;
+        }
+      }
       onDone();
     } catch (problem) {
       setError((problem as Error).message);
@@ -138,39 +215,102 @@ function AuthForm({ mode, onDone, children }: { mode: "setup" | "login" | "signu
   }
 
   return (
-    <Centered title={setup ? "Create the admin account" : mode === "signup" ? "Create an account" : "Sign in"}>
-      {setup && <p className="dim">This is the first run. The account you create here manages the whole panel.</p>}
-      {mode === "signup" && (
-        <p className="dim">After this, tell the server's owner your username so they can share the server with you.</p>
+    <Centered
+      title={
+        setup
+          ? "Create the admin account"
+          : mode === "signup"
+            ? "Create an account"
+            : "Sign in"
+      }
+    >
+      {setup && (
+        <p className="dim">
+          This is the first run. The account you create here manages the whole
+          panel.
+        </p>
       )}
-      <form onSubmit={submit}>
-        <label>
-          Username
-          <input value={username} onChange={(event) => setUsername(event.target.value)} autoComplete="username" required autoFocus />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            autoComplete={creating ? "new-password" : "current-password"}
-            minLength={creating ? 10 : undefined}
-            required
-          />
-          {creating && <small>At least 10 characters.</small>}
-        </label>
-        {error && <p className="error" role="alert">{error}</p>}
-        <button className="primary" disabled={busy}>
-          {creating ? "Create account" : "Sign in"}
-        </button>
-      </form>
-      {children}
+      {mode === "signup" && (
+        <p className="dim">
+          After this, tell the server's owner your username so they can share
+          the server with you.
+        </p>
+      )}
+      {ticket ? (
+        <form onSubmit={submit}>
+          <p className="dim">
+            Open your authenticator app and type the six-digit code for
+            Consolry. Lost your phone? Type one of your backup codes instead.
+          </p>
+          <label>
+            Code
+            <input
+              value={code}
+              onChange={(event) => setCode(event.target.value)}
+              autoComplete="one-time-code"
+              required
+              autoFocus
+            />
+          </label>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          <button className="primary" disabled={busy}>
+            Sign in
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={submit}>
+          <label>
+            Username
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              autoComplete="username"
+              required
+              autoFocus
+            />
+          </label>
+          <label>
+            Password
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete={creating ? "new-password" : "current-password"}
+              minLength={creating ? 10 : undefined}
+              required
+            />
+            {creating && <small>At least 10 characters.</small>}
+          </label>
+          {error && (
+            <p className="error" role="alert">
+              {error}
+            </p>
+          )}
+          <button className="primary" disabled={busy}>
+            {creating ? "Create account" : "Sign in"}
+          </button>
+        </form>
+      )}
+      {!ticket && children}
     </Centered>
   );
 }
 
-function Panel({ user, version, onSignOut }: { user: User; version: string; onSignOut: () => void }) {
+function Panel({
+  user,
+  version,
+  onSignOut,
+  onAccountChanged,
+}: {
+  user: User;
+  version: string;
+  onSignOut: () => void;
+  onAccountChanged: () => void;
+}) {
   const { username, admin } = user;
   const [servers, setServers] = useState<ServerInfo[] | null>(null);
   const [nodes, setNodes] = useState<NodeInfo[] | null>(null);
@@ -186,7 +326,10 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
       api.servers().then(
         (list) => {
           for (const server of list) {
-            const samples = history.current.get(server.id) ?? { cpu: [], memory: [] };
+            const samples = history.current.get(server.id) ?? {
+              cpu: [],
+              memory: [],
+            };
             if (server.state === "running") {
               samples.cpu = [...samples.cpu, server.cpu].slice(-90);
               samples.memory = [...samples.memory, server.memory].slice(-90);
@@ -203,7 +346,10 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
     [],
   );
   // Only the admin manages nodes; everyone else just sees the servers shared with them.
-  const loadNodes = useCallback(() => (admin ? api.nodes().then(setNodes, () => {}) : setNodes([])), [admin]);
+  const loadNodes = useCallback(
+    () => (admin ? api.nodes().then(setNodes, () => {}) : setNodes([])),
+    [admin],
+  );
 
   useEffect(() => {
     loadServers();
@@ -222,9 +368,24 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
   const owned = servers.filter((server) => server.owner).length;
   const canCreate = admin || owned < user.serverLimit;
 
-  const selected = view.kind === "server" ? servers.find((server) => server.id === view.id) : undefined;
+  const selected =
+    view.kind === "server"
+      ? servers.find((server) => server.id === view.id)
+      : undefined;
   const crumb =
-    view.kind === "server" ? (selected?.name ?? "Unknown server") : view.kind === "new-server" ? "New server" : view.kind === "nodes" ? "Nodes" : view.kind === "access" ? "Remote access" : view.kind === "accounts" ? "Accounts" : "Overview";
+    view.kind === "server"
+      ? (selected?.name ?? "Unknown server")
+      : view.kind === "new-server"
+        ? "New server"
+        : view.kind === "nodes"
+          ? "Nodes"
+          : view.kind === "access"
+            ? "Remote access"
+            : view.kind === "accounts"
+              ? "Accounts"
+              : view.kind === "account"
+                ? "Your account"
+                : "Overview";
 
   return (
     <div className="shell">
@@ -238,7 +399,9 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
           <strong>{crumb}</strong>
         </p>
         <span className="chip">v{version}</span>
-        <span className="who">{username}</span>
+        <a className="who" href="#/account" title="Your account">
+          {username}
+        </a>
         <button className="small" onClick={onSignOut}>
           Sign out
         </button>
@@ -250,17 +413,26 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
             Overview
           </a>
           {admin && (
-            <a href="#/nodes" className={view.kind === "nodes" ? "on" : undefined}>
+            <a
+              href="#/nodes"
+              className={view.kind === "nodes" ? "on" : undefined}
+            >
               Nodes <span className="count">{nodes.length}</span>
             </a>
           )}
           {admin && (
-            <a href="#/accounts" className={view.kind === "accounts" ? "on" : undefined}>
+            <a
+              href="#/accounts"
+              className={view.kind === "accounts" ? "on" : undefined}
+            >
               Accounts
             </a>
           )}
           {admin && (
-            <a href="#/access" className={view.kind === "access" ? "on" : undefined}>
+            <a
+              href="#/access"
+              className={view.kind === "access" ? "on" : undefined}
+            >
               Remote access
             </a>
           )}
@@ -268,7 +440,11 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
         <p className="pixel heading">Servers</p>
         <nav aria-label="Servers">
           {servers.map((server) => (
-            <a key={server.id} href={`#/servers/${server.id}`} className={selected?.id === server.id ? "on" : undefined}>
+            <a
+              key={server.id}
+              href={`#/servers/${server.id}`}
+              className={selected?.id === server.id ? "on" : undefined}
+            >
               <span className={`dot ${server.state}`} aria-hidden="true" />
               <span className="grow">
                 {server.name}
@@ -279,7 +455,10 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
           {servers.length === 0 && <p className="dim empty">None yet.</p>}
         </nav>
         {canCreate && (
-          <a href="#/new" className={view.kind === "new-server" ? "add on" : "add"}>
+          <a
+            href="#/new"
+            className={view.kind === "new-server" ? "add on" : "add"}
+          >
             + New server
           </a>
         )}
@@ -295,7 +474,16 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
             </button>
           </p>
         )}
-        {view.kind === "overview" && <Overview servers={servers} nodes={nodes} now={now} user={user} canCreate={canCreate} onChanged={loadServers} />}
+        {view.kind === "overview" && (
+          <Overview
+            servers={servers}
+            nodes={nodes}
+            now={now}
+            user={user}
+            canCreate={canCreate}
+            onChanged={loadServers}
+          />
+        )}
         {view.kind === "server" && selected && (
           <ServerPage
             key={selected.id}
@@ -311,13 +499,29 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
           />
         )}
         {view.kind === "server" && !selected && (
-          <Empty title="That server doesn't exist" action={<a className="button" href="#/">Back to overview</a>}>
+          <Empty
+            title="That server doesn't exist"
+            action={
+              <a className="button" href="#/">
+                Back to overview
+              </a>
+            }
+          >
             It may have been removed.
           </Empty>
         )}
         {view.kind === "new-server" && !canCreate && (
-          <Empty title="You can't create a server" action={<a className="button" href="#/">Back to overview</a>}>
-            {user.serverLimit > 0 ? `Your account may create ${user.serverLimit}, and you already have that many.` : "Ask the panel's admin to allow it for your account."}
+          <Empty
+            title="You can't create a server"
+            action={
+              <a className="button" href="#/">
+                Back to overview
+              </a>
+            }
+          >
+            {user.serverLimit > 0
+              ? `Your account may create ${user.serverLimit}, and you already have that many.`
+              : "Ask the panel's admin to allow it for your account."}
           </Empty>
         )}
         {view.kind === "new-server" && canCreate && (
@@ -332,9 +536,14 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
             }}
           />
         )}
-        {view.kind === "nodes" && admin && <Nodes nodes={nodes} onChanged={loadNodes} />}
+        {view.kind === "nodes" && admin && (
+          <Nodes nodes={nodes} onChanged={loadNodes} />
+        )}
         {view.kind === "access" && admin && <Access />}
         {view.kind === "accounts" && admin && <Accounts />}
+        {view.kind === "account" && (
+          <Account user={user} onChanged={onAccountChanged} />
+        )}
       </main>
     </div>
   );
@@ -357,15 +566,27 @@ function Overview({
 }) {
   const admin = user.admin;
   const { error, run } = useAction();
-  const power = (id: string, action: "start" | "stop") => run(action, () => api.power(id, action), onChanged);
+  const power = (id: string, action: "start" | "stop") =>
+    run(action, () => api.power(id, action), onChanged);
   const running = servers.filter((server) => server.state === "running").length;
-  const trouble = servers.filter((server) => server.state === "crashed" || server.state === "unreachable").length;
+  const trouble = servers.filter(
+    (server) => server.state === "crashed" || server.state === "unreachable",
+  ).length;
   const online = nodes.filter((node) => node.online).length;
 
   if (!admin && servers.length === 0 && canCreate) {
     return (
-      <Empty title="No servers yet" action={<a className="button primary" href="#/new">Create a server</a>}>
-        Your account may create {user.serverLimit === 1 ? "one server" : `${user.serverLimit} servers`} of its own.
+      <Empty
+        title="No servers yet"
+        action={
+          <a className="button primary" href="#/new">
+            Create a server
+          </a>
+        }
+      >
+        Your account may create{" "}
+        {user.serverLimit === 1 ? "one server" : `${user.serverLimit} servers`}{" "}
+        of its own.
       </Empty>
     );
   }
@@ -373,15 +594,24 @@ function Overview({
   if (!admin && servers.length === 0) {
     return (
       <Empty title="No servers shared with you yet">
-        Tell the server's owner your username, <strong>{user.username}</strong>, and ask them to invite you from the server's Users tab.
+        Tell the server's owner your username, <strong>{user.username}</strong>,
+        and ask them to invite you from the server's Users tab.
       </Empty>
     );
   }
 
   if (admin && nodes.length === 0) {
     return (
-      <Empty title="Connect your first node" action={<a className="button primary" href="#/nodes">Add a node</a>}>
-        A node is a machine running the Consolry daemon. Servers run on nodes, so add one to get started.
+      <Empty
+        title="Connect your first node"
+        action={
+          <a className="button primary" href="#/nodes">
+            Add a node
+          </a>
+        }
+      >
+        A node is a machine running the Consolry daemon. Servers run on nodes,
+        so add one to get started.
       </Empty>
     );
   }
@@ -421,8 +651,16 @@ function Overview({
       <ErrorNote message={error} />
 
       {servers.length === 0 ? (
-        <Empty title="No servers yet" action={<a className="button primary" href="#/new">Create a server</a>}>
-          Create one, put its files in its folder on the node, and start it from here.
+        <Empty
+          title="No servers yet"
+          action={
+            <a className="button primary" href="#/new">
+              Create a server
+            </a>
+          }
+        >
+          Create one, put its files in its folder on the node, and start it from
+          here.
         </Empty>
       ) : (
         <ul className="servers">
@@ -432,8 +670,14 @@ function Overview({
               <li key={server.id} className={`server ${server.state}`}>
                 <a href={`#/servers/${server.id}`} className="server-main">
                   <span className="server-name">{server.name}</span>
-                  <span className={`state ${server.state}`}>{stateLabel(server.state)}</span>
-                  <code>{server.kind === "minecraft" ? `${server.software} ${server.mcVersion}` : [server.command, ...server.args].join(" ") || "–"}</code>
+                  <span className={`state ${server.state}`}>
+                    {stateLabel(server.state)}
+                  </span>
+                  <code>
+                    {server.kind === "minecraft"
+                      ? `${server.software} ${server.mcVersion}`
+                      : [server.command, ...server.args].join(" ") || "–"}
+                  </code>
                 </a>
                 <dl>
                   <div>
@@ -447,11 +691,18 @@ function Overview({
                 </dl>
                 <div className="server-actions">
                   {!server.permissions.includes("power") ? null : live ? (
-                    <button disabled={server.state === "stopping"} onClick={() => power(server.id, "stop")}>
+                    <button
+                      disabled={server.state === "stopping"}
+                      onClick={() => power(server.id, "stop")}
+                    >
                       Stop
                     </button>
                   ) : (
-                    <button className="primary" disabled={server.state === "unreachable"} onClick={() => power(server.id, "start")}>
+                    <button
+                      className="primary"
+                      disabled={server.state === "unreachable"}
+                      onClick={() => power(server.id, "start")}
+                    >
                       Start
                     </button>
                   )}
@@ -468,7 +719,13 @@ function Overview({
   );
 }
 
-function Nodes({ nodes, onChanged }: { nodes: NodeInfo[]; onChanged: () => void }) {
+function Nodes({
+  nodes,
+  onChanged,
+}: {
+  nodes: NodeInfo[];
+  onChanged: () => void;
+}) {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("http://127.0.0.1:8750");
   const [token, setToken] = useState("");
@@ -506,19 +763,25 @@ function Nodes({ nodes, onChanged }: { nodes: NodeInfo[]; onChanged: () => void 
         <h1>Nodes</h1>
       </header>
       <p className="dim lead">
-        A node is a machine that runs servers. This machine is added for you. Add another only if you run the Consolry daemon on a second machine.
+        A node is a machine that runs servers. This machine is added for you.
+        Add another only if you run the Consolry daemon on a second machine.
       </p>
 
       {nodes.length > 0 && (
         <ul className="nodes">
           {nodes.map((node) => (
             <li key={node.id}>
-              <span className={`dot ${node.online ? "running" : "crashed"}`} aria-hidden="true" />
+              <span
+                className={`dot ${node.online ? "running" : "crashed"}`}
+                aria-hidden="true"
+              />
               <span className="grow">
                 <strong>{node.name}</strong>
                 <code>{node.url}</code>
               </span>
-              <span className="dim">{node.online ? `${node.os} · v${node.version}` : "Offline"}</span>
+              <span className="dim">
+                {node.online ? `${node.os} · v${node.version}` : "Offline"}
+              </span>
               <button className="small" onClick={() => remove(node.id)}>
                 Remove
               </button>
@@ -531,20 +794,42 @@ function Nodes({ nodes, onChanged }: { nodes: NodeInfo[]; onChanged: () => void 
         <h2>Add another machine</h2>
         <label>
           Name
-          <input value={name} onChange={(event) => setName(event.target.value)} required />
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            required
+          />
         </label>
         <label>
           Daemon address
-          <input className="mono" value={url} onChange={(event) => setUrl(event.target.value)} required spellCheck={false} />
+          <input
+            className="mono"
+            value={url}
+            onChange={(event) => setUrl(event.target.value)}
+            required
+            spellCheck={false}
+          />
         </label>
         <label>
           Daemon token
-          <input className="mono" value={token} onChange={(event) => setToken(event.target.value)} required spellCheck={false} autoComplete="off" />
+          <input
+            className="mono"
+            value={token}
+            onChange={(event) => setToken(event.target.value)}
+            required
+            spellCheck={false}
+            autoComplete="off"
+          />
           <small>
-            The daemon prints this the first time it starts, and keeps it in the <code>token</code> file in its data folder.
+            The daemon prints this the first time it starts, and keeps it in the{" "}
+            <code>token</code> file in its data folder.
           </small>
         </label>
-        {error && <p className="error" role="alert">{error}</p>}
+        {error && (
+          <p className="error" role="alert">
+            {error}
+          </p>
+        )}
         <button className="primary" disabled={busy}>
           Add node
         </button>
