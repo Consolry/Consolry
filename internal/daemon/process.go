@@ -70,7 +70,8 @@ func newServer(spec Spec, dir, javaDir string) *Server {
 }
 
 // minecraftReady matches the line a Minecraft server prints when the world has loaded.
-var minecraftReady = regexp.MustCompile(`Done \([0-9.,]+s\)`)
+// The "For help" part matters: plugins such as Geyser print their own "Done (1.9s)!" earlier.
+var minecraftReady = regexp.MustCompile(`Done \([0-9.,]+s\)! For help`)
 
 var logPrefix = regexp.MustCompile(`^\[[^\]]*\]:? ?`)
 

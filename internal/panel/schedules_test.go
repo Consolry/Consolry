@@ -95,7 +95,7 @@ func TestPlayerNames(t *testing.T) {
 	if !ready(append(loading, "[04:40:03 INFO]: Done (66.030s)! For help, type \"help\"")) {
 		t.Error("a server that printed Done is ready")
 	}
-	if ready([]string{"[04:40:03 INFO]: Done (66.030s)!", "[consolry] Server stopped (exit code 0)", "[consolry] Server started"}) {
+	if ready([]string{"[04:40:03 INFO]: Done (66.030s)! For help", "[consolry] Server stopped (exit code 0)", "[consolry] Server started"}) {
 		t.Error("Done from an earlier run must not count for the current one")
 	}
 }

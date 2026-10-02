@@ -20,7 +20,7 @@ var playerName = regexp.MustCompile(`^[A-Za-z0-9_.*]{1,32}$`)
 var listReply = regexp.MustCompile(`There are (\d+) (?:of a max(?: of)?|out of maximum) (\d+) players online[:.]?(.*)$`)
 
 // started matches the line Minecraft prints once the world has loaded and commands are safe to run.
-var started = regexp.MustCompile(`Done \([0-9.,]+s\)`)
+var started = regexp.MustCompile(`Done \([0-9.,]+s\)! For help`)
 
 // ready reports whether the server's current run has finished starting.
 func ready(lines []string) bool {
