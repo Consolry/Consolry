@@ -1590,3 +1590,46 @@ pre.command {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Console: the jump button sits over the log, and the starting banner keeps one fixed height
+   so it never resizes the console as its text changes. */
+
+.console-body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 280px;
+}
+
+.console-body pre {
+  height: auto;
+  min-height: 0;
+}
+
+.console .jump {
+  position: absolute;
+  right: 18px;
+  bottom: 12px;
+  background: var(--sun);
+  box-shadow: inset 0 -3px 0 #d9a91f;
+  color: #2b1d00;
+  font-size: 1.1rem;
+}
+
+.console .jump:hover:not(:disabled) {
+  background: #ffe07a;
+}
+
+.starting {
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.starting .pixel {
+  flex: none;
+}
+
+.starting .mono {
+  flex: 1;
+  min-width: 0;
+}

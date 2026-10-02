@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { consoleSocket } from "./api";
 
 const maxLines = 2000;
@@ -7,12 +7,21 @@ export default function Console({ serverId, running }: { serverId: string; runni
   const [lines, setLines] = useState<string[]>([]);
   const [connected, setConnected] = useState(false);
   const [following, setFollowing] = useState(true);
+  const [unseen, setUnseen] = useState(0);
   const [input, setInput] = useState("");
   const [filter, setFilter] = useState("");
   const socket = useRef<WebSocket | null>(null);
   const output = useRef<HTMLPreElement>(null);
+  const followingNow = useRef(true);
+  const lastTop = useRef(0);
   const history = useRef<string[]>([]);
   const historyAt = useRef(-1);
+
+  function follow(on: boolean) {
+    followingNow.current = on;
+    setFollowing(on);
+    if (on) setUnseen(0);
+  }
 
   useEffect(() => {
     let closed = false;
@@ -25,12 +34,15 @@ export default function Console({ serverId, running }: { serverId: string; runni
         // The daemon replays its history on connect, so start from empty each time.
         setLines([]);
         setConnected(true);
+        follow(true);
       };
       ws.onmessage = (event) => {
+        const line = String(event.data);
         // A fresh start is worth seeing even if the reader had scrolled up through the last run.
-        if (String(event.data).startsWith("[consolry] Server started")) setFollowing(true);
+        if (line.startsWith("[consolry] Server started")) follow(true);
+        else if (!followingNow.current) setUnseen((count) => count + 1);
         setLines((current) => {
-          const next = [...current, String(event.data)];
+          const next = [...current, line];
           return next.length > maxLines ? next.slice(-maxLines) : next;
         });
       };
@@ -49,15 +61,39 @@ export default function Console({ serverId, running }: { serverId: string; runni
     };
   }, [serverId]);
 
-  // Follow new output unless the reader has scrolled up to look at something.
+  const pin = () => {
+    const element = output.current;
+    if (element && followingNow.current) {
+      element.scrollTop = element.scrollHeight;
+      lastTop.current = element.scrollTop;
+    }
+  };
+
+  // Stay at the newest line as output arrives. This runs before the browser paints,
+  // so there is no moment where the view sits above the bottom.
+  useLayoutEffect(pin, [lines, following, filter]);
+
+  // The console is resized by things around it (a banner appearing, the window changing).
+  // That must keep it at the bottom, not count as the reader scrolling away.
   useEffect(() => {
     const element = output.current;
-    if (element && following) element.scrollTop = element.scrollHeight;
-  }, [lines, following]);
+    if (!element || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(pin);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
+  // Only the reader moving up stops the console following. Reaching the bottom resumes it.
   function onScroll() {
     const element = output.current;
-    if (element) setFollowing(element.scrollHeight - element.scrollTop - element.clientHeight < 24);
+    if (!element) return;
+    const atBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 24;
+    if (atBottom) {
+      if (!followingNow.current) follow(true);
+    } else if (element.scrollTop < lastTop.current - 4 && followingNow.current) {
+      follow(false);
+    }
+    lastTop.current = element.scrollTop;
   }
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -66,7 +102,7 @@ export default function Console({ serverId, running }: { serverId: string; runni
       history.current = [input, ...history.current.filter((item) => item !== input)].slice(0, 50);
       historyAt.current = -1;
       setInput("");
-      setFollowing(true);
+      follow(true);
     } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       const step = event.key === "ArrowUp" ? 1 : -1;
       const next = Math.max(-1, Math.min(history.current.length - 1, historyAt.current + step));
@@ -93,25 +129,27 @@ export default function Console({ serverId, running }: { serverId: string; runni
           placeholder="Search the log"
           aria-label="Search the log"
         />
+      </header>
+      <div className="console-body">
+        <pre ref={output} onScroll={onScroll} aria-label="Server output" tabIndex={0}>
+          {lines.length === 0 ? (
+            <span className="dim">{connected ? "No output yet. Start the server to see its log here." : "Connecting to the console…"}</span>
+          ) : shown.length === 0 ? (
+            <span className="dim">No lines contain "{filter}".</span>
+          ) : (
+            shown.map((line, index) => (
+              <span key={index} className={lineClass(line)}>
+                {line + "\n"}
+              </span>
+            ))
+          )}
+        </pre>
         {!following && (
-          <button className="small" onClick={() => setFollowing(true)}>
-            Jump to latest
+          <button className="jump" onClick={() => follow(true)}>
+            {unseen > 0 ? `${unseen} new line${unseen === 1 ? "" : "s"} below. Jump to latest` : "Jump to latest"}
           </button>
         )}
-      </header>
-      <pre ref={output} onScroll={onScroll} aria-label="Server output" tabIndex={0}>
-        {lines.length === 0 ? (
-          <span className="dim">{connected ? "No output yet. Start the server to see its log here." : "Connecting to the console…"}</span>
-        ) : shown.length === 0 ? (
-          <span className="dim">No lines contain "{filter}".</span>
-        ) : (
-          shown.map((line, index) => (
-            <span key={index} className={lineClass(line)}>
-              {line + "\n"}
-            </span>
-          ))
-        )}
-      </pre>
+      </div>
       <div className="console-input">
         <span aria-hidden="true">&gt;</span>
         <input
