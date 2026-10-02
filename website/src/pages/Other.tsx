@@ -60,8 +60,8 @@ export function RoadmapPage() {
     <>
       <PageHead
         label="Roadmap"
-        title="An early preview is out"
-        intro="Consolry is being built in the order below. The early preview already runs real Minecraft servers; the first full release has no date yet, and we would rather say that than guess."
+        title="A pre-release is available"
+        intro="Consolry is being built in the order below. The pre-release already runs real Minecraft servers, but it is not finished; the first full release has no date yet, and we would rather say that than guess."
       />
       <Section alt label="Build order" title="Eight stages, one at a time">
         <ol className="timeline">
@@ -102,17 +102,27 @@ export function RoadmapPage() {
   );
 }
 
-const exe = `${site.github}/releases/latest/download/Consolry.exe`;
+// Pre-releases are not what GitHub calls the "latest" release, so the link names the version.
+const exe = `${site.github}/releases/download/v${site.version}/Consolry.exe`;
 const installCommand = "curl -fsSL https://www.consolry.com/install.sh | sh";
 
 export function DownloadPage() {
   return (
     <>
       <PageHead
-        label="Download"
-        title="Install Consolry on your own machine"
-        intro="This is an early preview. It runs real Minecraft servers, but it is unfinished: expect bugs, and keep your own backups of anything important."
+        label={`Pre-release ${site.version}`}
+        title="Try Consolry on your own machine"
+        intro="Consolry is not finished yet. This pre-release runs real Minecraft servers, and you are welcome to use it, but expect bugs and missing features."
       />
+
+      <section className="section alt warning-band">
+        <div className="wrap">
+          <p className="warning">
+            <strong>This is a pre-release, not a finished product.</strong> Things may break or change between versions. Keep your own copy of any world you
+            care about, and do not open the panel itself to the internet.
+          </p>
+        </div>
+      </section>
 
       <section className="section alt">
         <div className="wrap downloads">
@@ -120,7 +130,7 @@ export function DownloadPage() {
             <p className="pixel">Windows 10 and 11</p>
             <h2>Windows</h2>
             <a className="button" href={exe}>
-              Download Consolry.exe
+              Download Consolry.exe (pre-release)
             </a>
             <ol className="steps">
               <li>Run the file you downloaded. A window opens and your browser shows the panel.</li>
@@ -128,8 +138,8 @@ export function DownloadPage() {
               <li>Create a server. Consolry downloads Minecraft and the right Java for you.</li>
             </ol>
             <p className="fine">
-              Windows may say it "protected your PC", because the preview is not yet signed. Choose <strong>More info</strong>, then{" "}
-              <strong>Run anyway</strong>. Keep the window open while your servers run.
+              Windows may say it "protected your PC", because the pre-release is not yet signed. Choose <strong>More info</strong>, then{" "}
+              <strong>Run anyway</strong>. Consolry then sits next to the clock as a blue icon.
             </p>
           </article>
 
@@ -166,9 +176,12 @@ export function DownloadPage() {
           </div>
           <div>
             <dt>Keep the panel private</dt>
-            <dd>The panel only answers on your own machine. Do not open it to the internet in this preview.</dd>
+            <dd>The panel only answers on your own machine. Do not open it to the internet in this pre-release.</dd>
           </div>
         </dl>
+        <p className="more">
+          <a href="/docs">Read the documentation</a>
+        </p>
         <p className="more">
           <a href={`${site.github}/releases`}>All versions and release notes</a>
         </p>

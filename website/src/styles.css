@@ -2300,3 +2300,228 @@ details p {
     justify-content: start;
   }
 }
+
+/* Pre-release warning */
+
+.warning-band {
+  padding: var(--s3) 0;
+}
+
+.warning {
+  max-width: 70ch;
+  padding: var(--s2) var(--s3);
+  background: var(--sun);
+  box-shadow: var(--pixel-box);
+  margin: 4px;
+}
+
+/* Documentation */
+
+.docs {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: var(--s5);
+  align-items: start;
+  padding-block: var(--s5) var(--s6);
+}
+
+.docs-nav {
+  position: sticky;
+  top: 96px;
+  display: grid;
+  gap: var(--s3);
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  padding: 4px;
+  font-size: 0.95rem;
+}
+
+.docs-nav .pixel {
+  margin-bottom: 6px;
+  color: var(--blue);
+}
+
+.docs-nav a {
+  display: block;
+  padding: 5px 10px;
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.docs-nav a:hover {
+  color: var(--ink);
+  background: var(--white);
+}
+
+.docs-nav a[aria-current="page"] {
+  color: var(--white);
+  background: var(--ink);
+}
+
+.doc {
+  min-width: 0;
+  max-width: 760px;
+}
+
+.doc h1 {
+  max-width: none;
+  font-size: clamp(2.6rem, 5vw, 3.8rem);
+}
+
+.doc .lede {
+  margin-top: var(--s2);
+}
+
+.doc-body {
+  margin-top: var(--s4);
+}
+
+.doc-body > * + * {
+  margin-top: var(--s2);
+}
+
+.doc-body h2 {
+  max-width: none;
+  margin-top: var(--s5);
+  font-size: 2.1rem;
+  line-height: 1;
+}
+
+.doc-body h3 {
+  margin-top: var(--s4);
+}
+
+.doc-body ul,
+.doc-body ol {
+  padding-left: 1.4em;
+}
+
+.doc-body ul {
+  list-style: square;
+}
+
+.doc-body ol {
+  list-style: decimal;
+}
+
+.doc-body li + li {
+  margin-top: 6px;
+}
+
+.doc-body li > ul,
+.doc-body li > ol {
+  margin-top: 6px;
+}
+
+.doc-body a {
+  color: var(--blue-dark);
+  text-underline-offset: 3px;
+}
+
+.doc-body code {
+  padding: 1px 5px;
+  background: var(--white);
+  border: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 0.88em;
+  overflow-wrap: anywhere;
+}
+
+.doc-body pre {
+  margin: var(--s3) 4px;
+  padding: var(--s2) var(--s3);
+  overflow-x: auto;
+  background: var(--ink);
+  color: #eaf2fb;
+  box-shadow: var(--pixel-box);
+}
+
+.doc-body pre code {
+  padding: 0;
+  background: none;
+  border: 0;
+  color: inherit;
+  overflow-wrap: normal;
+}
+
+.doc-body blockquote {
+  margin: var(--s3) 4px;
+  padding: var(--s2) var(--s3);
+  background: var(--sun);
+  box-shadow: var(--pixel-box);
+}
+
+.doc-body table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.doc-body th,
+.doc-body td {
+  padding: 8px 12px;
+  border: 2px solid var(--ink);
+  background: var(--white);
+  text-align: left;
+  vertical-align: top;
+}
+
+.doc-body th {
+  background: var(--ink);
+  color: var(--white);
+  font-weight: 600;
+}
+
+.doc-pager {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--s3);
+  margin: var(--s6) 4px 0;
+}
+
+.doc-pager a {
+  display: grid;
+  gap: 4px;
+  padding: var(--s2) var(--s3);
+  background: var(--white);
+  box-shadow: var(--pixel-box);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.doc-pager a:hover {
+  background: var(--sun);
+}
+
+.doc-pager .pixel {
+  color: var(--blue);
+}
+
+.doc-pager .next {
+  text-align: right;
+}
+
+@media (max-width: 860px) {
+  .docs {
+    grid-template-columns: 1fr;
+    gap: var(--s4);
+    padding-block: var(--s4) var(--s5);
+  }
+
+  .docs-nav {
+    position: static;
+    max-height: none;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    padding-bottom: var(--s3);
+    border-bottom: 4px solid var(--ink);
+  }
+
+  .doc-pager {
+    grid-template-columns: 1fr;
+  }
+
+  .doc-pager .next {
+    text-align: left;
+  }
+}

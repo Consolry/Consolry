@@ -24,8 +24,8 @@ export default function Layout({ path, children }: { path: string; children: Rea
       </a>
 
       <p className="announce">
-        <span className="pixel">Early preview</span>
-        Consolry now runs real Minecraft servers on Windows and Linux. <a href="/download">Download it</a>
+        <span className="pixel">Pre-release</span>
+        Consolry is not finished yet, but you can try it. <a href="/download">Get the pre-release</a>
       </p>
 
       <header className="site-header">
@@ -62,7 +62,7 @@ export default function Layout({ path, children }: { path: string; children: Rea
         <div className="wrap">
           <div>
             <Logo />
-            <p>An open source game server panel, licensed AGPL-3.0.</p>
+            <p>A game server panel you run yourself. Pre-release.</p>
             <p>
               Maintained by <a href={site.maintainer.url}>{site.maintainer.name}</a>
             </p>
@@ -74,7 +74,7 @@ export default function Layout({ path, children }: { path: string; children: Rea
                 {route.nav}
               </a>
             ))}
-            <a href={site.github}>Source code</a>
+            <a href={site.github}>GitHub</a>
             <a href={`${site.github}/issues`}>Issues</a>
           </nav>
           <p className="legal">

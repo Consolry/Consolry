@@ -3,12 +3,13 @@
 #
 #   curl -fsSL https://www.consolry.com/install.sh | sh
 #
-# It downloads the newest release from GitHub, checks it against the published
+# Consolry is a pre-release: it works, but it is not finished.
+#
+# It downloads the newest version from GitHub, checks it against the published
 # fingerprint, and puts one program called "consolry" on your PATH. Nothing else is changed.
 set -eu
 
 repo="DinoNaedYT/Consolry"
-base="https://github.com/$repo/releases/latest/download"
 
 if [ "$(uname -s)" != "Linux" ]; then
   echo "This installer is for Linux. On Windows, download Consolry.exe from https://www.consolry.com/download" >&2
@@ -32,11 +33,19 @@ else
 fi
 mkdir -p "$target"
 
+# Pre-releases are not GitHub's "latest" release, so ask for the newest one of any kind.
+tag="$(curl -fsSL "https://api.github.com/repos/$repo/releases?per_page=1" | grep -o '"tag_name": *"[^"]*"' | head -n 1 | cut -d'"' -f4)"
+if [ -z "$tag" ]; then
+  echo "Could not find a Consolry version to download. Check https://www.consolry.com/download" >&2
+  exit 1
+fi
+base="https://github.com/$repo/releases/download/$tag"
+
 file="consolry-linux-$arch"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-echo "Downloading Consolry for Linux ($arch)..."
+echo "Downloading Consolry $tag for Linux ($arch). This is a pre-release: expect rough edges."
 curl -fsSL "$base/$file" -o "$work/$file"
 curl -fsSL "$base/checksums.txt" -o "$work/checksums.txt"
 
@@ -56,4 +65,5 @@ case ":$PATH:" in
   *) echo "Start it with:  $target/consolry" ;;
 esac
 echo "Then open http://127.0.0.1:8700 in a browser on this machine."
-echo "On a server with no screen, see https://www.consolry.com/download for how to reach it from another computer."
+echo "To keep it running in the background:  consolry -autostart on"
+echo "Documentation: https://docs.consolry.com"

@@ -1,4 +1,8 @@
+import { docs } from "./docs";
+
 export const site = {
+  // The pre-release the download page links to. Change it when a new version is published.
+  version: "0.1.0",
   url: "https://www.consolry.com",
   name: "Consolry",
   // The Buttondown account name, from buttondown.com/<name>. Empty means the waitlist is closed.
@@ -14,7 +18,7 @@ export const stack = [
   { part: "Isolation on Linux", detail: "Each server runs in its own Docker container, with CPU, memory and disk limits." },
   { part: "Isolation on Windows", detail: "Each server runs as a normal process. Meant for your own servers, not for untrusted customers." },
   { part: "Game modules", detail: "Compiled into the panel. Minecraft is the first; the same interface becomes the public SDK." },
-  { part: "Licence", detail: "AGPL-3.0 for the core. Paid features ship as separate modules." },
+  { part: "Licence", detail: "The core will be released as open source under AGPL-3.0 at the first full release. Paid features ship as separate modules." },
 ];
 
 export const support = [
@@ -26,13 +30,15 @@ export const support = [
   { area: "Login", first: "Password, two-factor, single sign-on", later: "Passkeys" },
 ];
 
-export const routes = [
+type Route = { path: string; nav: string; title: string; description: string; canonical?: string };
+
+const siteRoutes: Route[] = [
   {
     path: "/",
     nav: "",
     title: "Consolry: the game server panel that knows your game",
     description:
-      "Consolry is an open source game server panel that manages Minecraft plugins, updates, crashes and configs for you, on Windows or Linux.",
+      "Consolry is a game server panel that manages Minecraft plugins, updates, crashes and configs for you, on Windows or Linux.",
   },
   {
     path: "/features",
@@ -45,7 +51,7 @@ export const routes = [
     path: "/download",
     nav: "Download",
     title: "Download | Consolry",
-    description: "Download the Consolry early preview: an .exe for Windows, or one command to install on Linux.",
+    description: "Download the Consolry pre-release: an .exe for Windows, or one command to install on Linux. Not finished yet.",
   },
   {
     path: "/pricing",
@@ -68,7 +74,18 @@ export const routes = [
   },
 ];
 
-export const checks = ["Free open source core", "Windows and Linux", "No Docker needed on Windows"];
+// The documentation also answers at docs.consolry.com, which is the address search engines are given.
+const docRoutes: Route[] = docs.map((doc) => ({
+  path: doc.path,
+  nav: doc.slug ? "" : "Docs",
+  title: `${doc.title} | Consolry Docs`,
+  description: doc.description,
+  canonical: `https://docs.consolry.com/${doc.slug}`,
+}));
+
+export const routes: Route[] = siteRoutes.flatMap((route) => (route.path === "/download" ? [route, ...docRoutes] : [route]));
+
+export const checks = ["Free to run on your own machine", "Windows and Linux", "No Docker needed on Windows"];
 
 export const problems = [
   {
@@ -268,11 +285,11 @@ export const firstRelease = [
 export const faqs = [
   {
     q: "Is it really free?",
-    a: "Yes. The Community edition is free, has no server or node limit, and its source is open under the AGPL-3.0 licence. Paid plans add things that save time or help teams and hosts. Anything you need to run a server safely, like backups and two-factor login, stays free.",
+    a: "Yes. The Community edition is free, has no server or node limit, and its core will be released as open source at the first full release. Paid plans add things that save time or help teams and hosts. Anything you need to run a server safely, like backups and two-factor login, stays free.",
   },
   {
     q: "Can I use it yet?",
-    a: "Yes, as an early preview for Windows and Linux, from the Download page. It is unfinished: expect bugs and missing features, and keep your own backups of anything important. Join the waitlist for one email when the first full release is ready.",
+    a: "Yes, as a pre-release for Windows and Linux, from the Download page. It is not finished: expect bugs and missing features, and keep your own backups of anything important. Join the waitlist for one email when the first full release is ready.",
   },
   {
     q: "Can I run it on Windows without Docker?",

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import Layout from "./components/Layout";
 import { routes, site } from "./content";
+import DocsPage from "./pages/Docs";
 import Features from "./pages/Features";
 import Home from "./pages/Home";
 import { DownloadPage, FaqPage, NotFound, PricingPage, RoadmapPage } from "./pages/Other";
@@ -8,6 +9,18 @@ import { DownloadPage, FaqPage, NotFound, PricingPage, RoadmapPage } from "./pag
 export function normalise(pathname: string) {
   return pathname.replace(/\/+$/, "") || "/";
 }
+
+// The documentation is also served at docs.consolry.com, where "/install-linux" means "/docs/install-linux".
+const onDocsHost = () => typeof location !== "undefined" && location.hostname.startsWith("docs.");
+
+/** The page the browser is on, as a path within the site. */
+export function currentPath() {
+  const path = normalise(location.pathname);
+  if (!onDocsHost() || path.startsWith("/docs")) return path;
+  return path === "/" ? "/docs" : `/docs${path}`;
+}
+
+const known = (path: string) => routes.some((route) => route.path === path);
 
 const pages: Record<string, () => React.JSX.Element> = {
   "/": Home,
@@ -26,7 +39,6 @@ const structuredData = {
   description: routes[0].description,
   applicationCategory: "GameApplication",
   operatingSystem: "Windows, Linux",
-  license: "https://www.gnu.org/licenses/agpl-3.0.html",
   offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
 };
 
@@ -36,7 +48,7 @@ function useRoute(initial: string) {
   const [path, setPath] = useState(initial);
 
   useEffect(() => {
-    const onPop = () => setPath(normalise(location.pathname));
+    const onPop = () => setPath(currentPath());
 
     const onClick = (event: MouseEvent) => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
@@ -44,10 +56,16 @@ function useRoute(initial: string) {
       }
       const link = (event.target as Element).closest("a");
       if (!link || link.target || link.origin !== location.origin) return;
-      const next = normalise(link.pathname);
-      if (next === normalise(location.pathname) || !(next in pages)) return;
+      let next = normalise(link.pathname);
+      if (onDocsHost() && !next.startsWith("/docs")) {
+        // On the docs address only documentation is served; other links go to the main site.
+        if (next !== "/") return;
+        next = "/docs";
+      }
+      if (next === currentPath() || !known(next)) return;
       event.preventDefault();
-      history.pushState(null, "", next + link.hash);
+      const shown = onDocsHost() ? next.slice("/docs".length) || "/" : next;
+      history.pushState(null, "", shown + link.hash);
       setPath(next);
       window.scrollTo(0, 0);
     };
@@ -71,13 +89,14 @@ function useRoute(initial: string) {
 export default function App({ initialPath }: { initialPath: string }) {
   const path = useRoute(initialPath);
   const Page = pages[path] ?? NotFound;
+  const isDoc = !(path in pages) && path.startsWith("/docs");
 
   return (
     <Layout path={path}>
       {path === "/" && (
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       )}
-      <Page />
+      {isDoc ? <DocsPage path={path} /> : <Page />}
     </Layout>
   );
 }

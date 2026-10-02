@@ -4,5 +4,51 @@
   "outputDirectory": "dist",
   "framework": null,
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/docs/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "docs.consolry.com"
+        }
+      ],
+      "destination": "/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/:page(features|download|pricing|roadmap|faq)",
+      "has": [
+        {
+          "type": "host",
+          "value": "docs.consolry.com"
+        }
+      ],
+      "destination": "https://www.consolry.com/:page",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "docs.consolry.com"
+        }
+      ],
+      "destination": "/docs"
+    },
+    {
+      "source": "/((?!assets/|docs/|docs$|favicon\\.svg|install\\.sh|robots\\.txt|sitemap\\.xml).+)",
+      "has": [
+        {
+          "type": "host",
+          "value": "docs.consolry.com"
+        }
+      ],
+      "destination": "/docs/$1"
+    }
+  ]
 }

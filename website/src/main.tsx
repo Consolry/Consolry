@@ -1,12 +1,12 @@
 import { StrictMode } from "react";
 import { createRoot, hydrateRoot } from "react-dom/client";
-import App, { normalise } from "./App";
+import App, { currentPath } from "./App";
 import "./styles.css";
 
 const root = document.getElementById("root")!;
 const app = (
   <StrictMode>
-    <App initialPath={normalise(location.pathname)} />
+    <App initialPath={currentPath()} />
   </StrictMode>
 );
 

@@ -20,13 +20,13 @@ export default function Home() {
             </p>
             <div className="actions">
               <a href="/download" className="button">
-                Download the preview
+                Try the pre-release
               </a>
               <a href="/features" className="button ghost">
                 See the features
               </a>
               <a href={site.github} className="source-link">
-                Source on GitHub
+                Follow on GitHub
               </a>
             </div>
             <ul className="checks">
@@ -91,11 +91,11 @@ export default function Home() {
         <div className="wrap split">
           <div>
             <p className="label">Free and open</p>
-            <h2>The core is open source, and safety is never paywalled.</h2>
+            <h2>Free to run, and safety is never paywalled.</h2>
           </div>
           <div className="split-text">
             <p>
-              The Community edition is free under the AGPL-3.0 licence, with no limit on servers or nodes.
+              The Community edition is free, with no limit on servers or nodes. Its core will be released as open source at the first full release.
               Backups, two-factor login and crash reports stay free.
             </p>
             <p>Paid plans start at $6 a month and add time savers, team features and tools for hosts.</p>

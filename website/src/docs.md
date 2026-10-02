@@ -1,0 +1,422 @@
+=== | Start here | Getting started | What Consolry is, what you need, and where to begin.
+
+Consolry is a game server panel you install on your own computer. It runs Minecraft servers and gives you a web page to manage them: a console, files, plugins, players, backups and schedules.
+
+> **Consolry is a pre-release.** It works, but it is not finished. Expect bugs and missing features, and keep your own copy of any world you care about.
+
+## What you need
+
+- A computer running **Windows 10 or 11**, or **64-bit Linux** (Intel, AMD or ARM).
+- About 2 GB of free memory for each Minecraft server, and a few GB of disk space.
+- An internet connection, to download Minecraft and plugins.
+
+You do **not** need to install Java, Docker or a database. Consolry downloads the right Java for each server and keeps its own data in one folder.
+
+## The short version
+
+1. Install Consolry: [on Windows](/docs/install-windows) or [on Linux](/docs/install-linux).
+2. Open the panel in your browser and create your admin account.
+3. [Create your first server](/docs/first-server).
+4. [Open a port](/docs/network) if friends outside your home should be able to join.
+
+## How it fits together
+
+Consolry is one program. It serves the panel at `http://127.0.0.1:8700` and runs your servers on the same machine. Everything stays on that computer: your account, your worlds and your backups.
+
+=== install-windows | Start here | Install on Windows | Download one file, run it, and create your account.
+
+## Install
+
+1. Download **Consolry.exe** from the [download page](https://www.consolry.com/download).
+2. Run it. Your browser opens the panel at `http://127.0.0.1:8700`.
+3. Create your admin account. The password needs at least 10 characters.
+
+Consolry has no installer and no setup wizard. The file you downloaded is the whole program.
+
+## "Windows protected your PC"
+
+Windows shows this for programs that are not code-signed, and the pre-release is not signed yet. Choose **More info**, then **Run anyway**.
+
+## Where it runs
+
+Consolry has no window. It sits in the notification area, next to the clock, as a blue icon. You may need to click the `^` arrow to see it. Right-click the icon for:
+
+- **Open Consolry**: shows the panel in your browser.
+- **Start when I sign in**: tick this so your servers come back after a restart.
+- **Quit and stop servers**: saves and closes every server, then exits.
+
+Running the file a second time does not start a second copy. It just opens the panel.
+
+## Where your data is kept
+
+In `%LOCALAPPDATA%\Consolry`, which is usually `C:\Users\you\AppData\Local\Consolry`. See [Your data](/docs/data).
+
+Keep `Consolry.exe` somewhere it can stay, such as that same folder. If you tick "Start when I sign in" and later move the file, untick it and tick it again.
+
+=== install-linux | Start here | Install on Linux | One command installs it. A second sets it up to run in the background.
+
+## Install
+
+Run this in a terminal:
+
+```
+curl -fsSL https://www.consolry.com/install.sh | sh
+```
+
+It downloads the newest pre-release for your processor, checks it against its published fingerprint, and installs a single program called `consolry`. It does not need root: without root it installs to `~/.local/bin`.
+
+## Start it
+
+```
+consolry
+```
+
+Then open `http://127.0.0.1:8700` in a browser on that machine and create your admin account.
+
+## Run it in the background
+
+To keep Consolry running after you close the terminal, and start it when you sign in:
+
+```
+consolry -autostart on
+```
+
+This sets up a systemd service for your user. To keep it running while you are signed out, which you want on a server, also run once:
+
+```
+sudo loginctl enable-linger $USER
+```
+
+Turn it off again with `consolry -autostart off`. Read its log with `journalctl --user -u consolry -f`.
+
+## No screen on that machine?
+
+The panel only answers on the machine it runs on. From your own computer, open a tunnel:
+
+```
+ssh -L 8700:127.0.0.1:8700 you@your-server
+```
+
+Leave that running and open `http://127.0.0.1:8700` on your own computer.
+
+Do not put the panel directly on the internet in this pre-release. It has no HTTPS of its own yet.
+
+=== first-server | Start here | Your first server | Pick the software, a version and how much memory. Consolry does the rest.
+
+## Create it
+
+1. In the panel, choose **New server**.
+2. Give it a name.
+3. Pick the **server software**:
+   - **Paper**: runs plugins and is fast. The usual choice.
+   - **Purpur**: Paper with extra settings.
+   - **Fabric**: runs mods instead of plugins.
+4. Pick the **Minecraft version** and how much **memory** it may use.
+5. Tick the box to accept the Minecraft EULA. A Minecraft server will not start without it.
+6. Choose **Create server**.
+
+Consolry downloads the server, checks the download, and installs a suitable Java if your computer does not have one.
+
+## Start it
+
+Open the server and press **Start**. The status reads **Starting** with the latest line from the log, then **Running** once Minecraft is ready. A new server usually takes 20 to 40 seconds; one with many plugins takes longer.
+
+## Join it
+
+On the same computer, add a server in Minecraft with the address `localhost`. For other devices and for friends, see [Network](/docs/network).
+
+## How much memory?
+
+2 GB is enough for a few friends on a plain server. Add more for many plugins or players, but leave a few GB free for the rest of your computer. You can change it later on the [Startup](/docs/startup) tab.
+
+=== console | Managing a server | Console | Watch the server's log live and type commands.
+
+The Console tab shows what the server prints, as it happens, and lets you send commands.
+
+## Sending commands
+
+Type a command and press Enter. Leave out the `/` you would type in the game: `say hello`, not `/say hello`. The up and down arrows step through commands you sent before.
+
+## Colours
+
+- **Time** is dimmed, and the level is coloured: INFO blue, WARN yellow, ERROR red.
+- **Plugin names in square brackets** show how that plugin is doing in this run: green once it has enabled, yellow if it has warned, red if it has logged an error or failed to load, grey if it was disabled.
+- Where the server colours text itself, such as the plugin list from `plugins`, those colours are kept.
+
+## Following and searching
+
+The console stays on the newest line. Scroll up to read back and it stops following; a yellow button shows how many new lines are waiting and jumps back down. The search box filters the log to lines containing your text.
+
+The console keeps the last 2,000 lines. Older lines are in the server's `logs` folder, under [Files](/docs/files).
+
+## When a server stops unexpectedly
+
+A **What went wrong** box appears above the console when Consolry recognises the cause, with what to do about it. It covers common cases: the EULA not accepted, the port already in use, running out of memory, Java too old, a plugin missing something it depends on, and a plugin failing as it starts. It only recognises known patterns, so no box does not mean nothing went wrong.
+
+=== files | Managing a server | Files | Browse, edit, upload and download a server's files.
+
+The Files tab shows the server's own folder.
+
+- **Open a folder** by clicking it. The path at the top takes you back up.
+- **Edit a text file** by clicking it. Change it, then **Save**.
+- **Upload** files from your computer into the folder you are looking at.
+- **New file** and **New folder** create empty ones.
+- **Download**, **Rename** and **Delete** are on each row. Deleting a folder deletes everything in it.
+
+Large files and files that are not text, such as `.jar` files and world data, download instead of opening in the editor.
+
+Most settings files are only read when the server starts, so restart the server after changing one. For the common Minecraft settings, the [Game settings](/docs/game-settings) tab is easier than editing `server.properties` by hand.
+
+A server can only reach its own folder. Nothing in the Files tab can read or change files anywhere else on your computer.
+
+=== plugins | Managing a server | Plugins and mods | Find, install, update and remove plugins from inside the panel.
+
+On Paper and Purpur servers this tab is called **Plugins**. On Fabric servers it is **Mods**.
+
+## Browse and install
+
+**Browse** shows the most downloaded plugins that have a version for your server, 16 to a page. Use the search box to find one by name. Press **Install** on a card.
+
+- Anything the plugin requires is installed with it.
+- A [backup](/docs/backups) is taken first.
+- If the server is running, restart it to load the new plugin.
+
+Plugins come from [Modrinth](https://modrinth.com). A plugin that is not on Modrinth can be uploaded into the `plugins` folder on the [Files](/docs/files) tab.
+
+## Installed
+
+**Installed** lists what is in the server's plugins folder.
+
+- **Verified** means the file is exactly what its author published on Modrinth.
+- **Unverified** means Consolry cannot match it. That is normal for plugins from other sites. It is not a sign that the file is harmful, only that it could not be checked.
+- **Update** appears when a newer version exists for your server.
+- **Remove** deletes the plugin's file. Its settings folder stays.
+
+=== players | Managing a server | Players | See who is online, and manage the whitelist, operators and bans.
+
+The Players tab is available on Minecraft servers.
+
+- **Online** lists who is connected. Each player has **Make operator**, **Kick** and **Ban**.
+- **Whitelist**: when it is on, only listed players can join. Add a name and turn it on before you share your address with anyone.
+- **Operators** can run every command in the game. Give this to people you trust.
+- **Banned** lists banned players, with **Unban**.
+
+The lists are read from the server's files, so you can see them while it is off. Adding, removing, kicking and banning go through the game itself, so they need the server to be running.
+
+=== game-settings | Managing a server | Game settings | Change the common Minecraft settings in a form.
+
+This tab edits `server.properties` for you. It shows the settings most people change: the message in the server list, player limit, game mode, difficulty, whitelist, view distance, port and more.
+
+Change what you want. Before you save, a box lists exactly which lines will change. Press **Save game settings**, then restart the server.
+
+Only settings your version of Minecraft has are shown. Everything else in the file is left exactly as it is; edit those on the [Files](/docs/files) tab.
+
+If the tab says to start the server once, do that. Minecraft creates its settings file on the first run.
+
+Leave **Check players own Minecraft** on unless you know why you need it off. Turning it off lets anyone join under any name.
+
+=== backups | Managing a server | Backups | Keep copies of a server and restore one when something goes wrong.
+
+A backup is a copy of every file in the server's folder: the world, plugins and settings.
+
+## Taking one
+
+Press **Back up now**. For a clean copy, stop the server first. A backup taken while it runs may catch the world mid-save, and files the running server has locked are left out; the panel tells you which.
+
+## Automatic backups
+
+- **Before a change.** Consolry takes one before installing or updating a plugin and before switching version. The newest 5 are kept.
+- **On a schedule.** Add a backup [schedule](/docs/schedules). The newest 7 are kept.
+
+Backups you take by hand are never deleted automatically.
+
+## Restoring
+
+Stop the server, then press **Restore** on a backup. Every file on the server is replaced with the backup's copy, so anything made since then is lost.
+
+## Where they are kept
+
+On the same computer, in Consolry's [data folder](/docs/data). That protects you from a bad plugin or a mistake, but not from a failed disk. Press **Download** on a backup to keep a copy somewhere else.
+
+Folders that Minecraft downloads again by itself, such as `libraries` and `cache`, are left out to keep backups small.
+
+=== schedules | Managing a server | Schedules | Restart, back up or run a command automatically.
+
+A schedule does something to a server at set times.
+
+## What it can do
+
+- Restart, start or stop the server.
+- Take a backup.
+- Run a console command, such as `say The server restarts in 5 minutes`.
+
+## When
+
+Every day at a time, every week on a day and time, or every few hours. Times use the clock of the computer Consolry runs on.
+
+## Things to know
+
+- Schedules only run while Consolry is running. Set it to [run in the background](/docs/background).
+- A daily or weekly run that was missed because the computer was off is skipped, not run late.
+- A console command only works while the server is running.
+- **Run now** tries a schedule straight away. **Pause** keeps it without running it.
+
+A nightly restart and a daily backup are a good start.
+
+=== network | Managing a server | Network and ports | Let other devices and friends outside your home join.
+
+The Network tab shows how players reach the server.
+
+## On your home network
+
+Other devices on the same Wi-Fi join with the address shown under **On your home network**, such as `192.168.1.20`. If the port is not 25565, they add it: `192.168.1.20:25566`.
+
+## Friends outside your home
+
+Your router blocks connections from the internet until you open the server's port. Press **Open the port for me**. Consolry asks the router to forward the port and shows the address your friends should use.
+
+That address is your home's public address. Share it only with people you trust, and turn on the whitelist on the [Players](/docs/players) tab first.
+
+Consolry reopens the port each time the server starts. **Close the port** removes it.
+
+## If the router refuses
+
+- **"Your router already has a rule for port 25565"**: a rule was added by hand in the router's own settings. Open the router's port forwarding page. If the rule points at this computer, the port is already open and you need nothing else. Otherwise change or delete it, or give the server a different port.
+- **"Your router did not answer"**: the router has UPnP switched off. Turn it on in the router's settings, or forward the port there by hand: TCP, the server's port, to this computer's address.
+- **"Its own address is not a public one"**: your internet provider shares one address between customers. Forwarding cannot work; you would need a tunnel service.
+
+## Changing the port
+
+Stop the server, enter a new port, and save. Use a different port for each server you run at the same time.
+
+=== startup | Managing a server | Startup | Memory, Java options and how the server is launched.
+
+## Memory
+
+How much memory Java may use. Stop the server to change it. Leave a few GB free for the rest of your computer.
+
+## Extra Java options
+
+Advanced. Consolry sets the memory and the server file itself; anything you add here goes between them.
+
+- **Add the faster-startup option** makes Java remember what it loaded and reuse it next time. It measured about 8% faster. It takes effect after one clean stop.
+- **Use Paper's recommended options** fills in the set Paper suggests for your version.
+
+## Stop command
+
+The command typed into the console to shut the server down cleanly. For Minecraft it is `stop`.
+
+## Which Java is used
+
+The page says which Java the server needs and which one will run it. If your computer's own Java is new enough, that is used. Otherwise Consolry uses a copy it downloaded for itself, kept in its data folder. It never changes the Java installed on your computer.
+
+=== background | Running Consolry | Running in the background | Keep your servers up after you close the window or restart.
+
+Your servers only run while Consolry runs.
+
+## Windows
+
+Consolry runs from an icon in the notification area and has no window to close by accident. Right-click the icon and tick **Start when I sign in** to bring it back after a restart.
+
+## Linux
+
+```
+consolry -autostart on
+sudo loginctl enable-linger $USER
+```
+
+The first line installs a background service for your user. The second keeps it running while you are signed out.
+
+## Stopping safely
+
+Use **Quit and stop servers** on Windows, or stop the service on Linux. Consolry tells each server to stop and waits for it to save before exiting. Ending the program from Task Manager, or pulling the power, skips that and can lose recent changes to a world.
+
+## After a restart
+
+Consolry comes back, but your servers stay off until you start them. To start one automatically, add a [schedule](/docs/schedules) or start it from the panel.
+
+=== data | Running Consolry | Your data | Where Consolry keeps everything, and how to back it up, move it and remove it.
+
+## Where it is
+
+- **Windows:** `%LOCALAPPDATA%\Consolry`
+- **Linux:** `~/.local/share/consolry`
+
+Inside:
+
+| Item | What it holds |
+| --- | --- |
+| `consolry.db` | Your account, server list, schedules and activity log |
+| `daemon-data/servers` | Each server's files, including its world |
+| `daemon-data/backups` | Backups |
+| `daemon-data/java` | Any Java that Consolry downloaded |
+| `consolry.log` | Consolry's own log |
+
+To use a different folder, start Consolry with `-dir "D:\Consolry"`.
+
+Do not keep this folder inside OneDrive, Dropbox or similar. They upload world files while the server is using them, which slows the server and can damage the world.
+
+## Backing it all up
+
+Quit Consolry, then copy the whole folder.
+
+## Moving to another computer
+
+Quit Consolry, copy the folder to the same place on the new computer, and start Consolry there.
+
+## Updating
+
+Quit Consolry, replace the program file with the newer one, and start it again. Your data is not touched. On Linux, run the install command again.
+
+## Removing it
+
+Quit Consolry and untick **Start when I sign in**, or run `consolry -autostart off` on Linux. Then delete the program file and the data folder. Deleting the data folder deletes your worlds and backups.
+
+=== second-machine | Running Consolry | A second machine | Run servers on another computer from the same panel.
+
+One panel can manage servers on more than one computer. Each extra computer runs a small program, the daemon, and appears in the panel as a **node**.
+
+1. Download `consolry-daemon` for that computer from the release files.
+2. Start it there. The first time, it prints a **token**.
+3. In the panel, open **Nodes** and choose **Add another machine**. Enter a name, the daemon's address and the token.
+4. When you create a server, choose which node it runs on.
+
+The daemon listens on `127.0.0.1:8750` by default, which only the same computer can reach. To reach it from the panel's computer, start it with `-listen` and an address on your private network.
+
+The link between the panel and a daemon is not encrypted in this pre-release. Only use it across a network you trust, never across the internet.
+
+Most people do not need this. The panel already runs servers on the computer it is installed on.
+
+=== troubleshooting | Help | Troubleshooting | Fixes for the problems people hit most.
+
+## The panel will not open
+
+Consolry is probably not running. On Windows, look for its icon by the clock; if it is missing, run `Consolry.exe`. On Linux, run `consolry`, or check the service with `systemctl --user status consolry`.
+
+## A server will not start
+
+Open its Console tab. If a **What went wrong** box appears, follow it. The usual causes:
+
+- **The port is already in use.** Another server is using the same port. Stop it, or change this server's port on the [Network](/docs/network) tab.
+- **Java is too old or missing.** Consolry normally installs what is needed. If that failed, the message says which version to install.
+- **A plugin is missing something it depends on.** Install the plugin it names, or remove the one that needs it.
+
+## A server takes a long time to start
+
+It shows **Starting** with its latest log line while it loads. Plugins are usually what takes the time: each one adds to it. A server with 30 plugins can take a minute. See also the faster-startup option on the [Startup](/docs/startup) tab, and keep the [data folder](/docs/data) out of OneDrive.
+
+## Friends cannot join
+
+Work through the [Network](/docs/network) page. Check the server is running, the port is open on your router, and they are using your public address, with the port added if it is not 25565.
+
+## The console stops updating
+
+Refresh the page with Ctrl+F5. If it still stops, note whether the light at the top of the console says **Live** or **Reconnecting**, and report it.
+
+## I forgot my password
+
+There is no reset yet. This is a known gap in the pre-release.
+
+## Reporting a problem
+
+Open an issue on [GitHub](https://github.com/DinoNaedYT/Consolry/issues). Include what you did, what happened, and the last lines of `consolry.log` from the [data folder](/docs/data).
