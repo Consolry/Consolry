@@ -64,6 +64,16 @@ func (a *App) handleUpdateServer(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	if user, _ := r.Context().Value(userKey).(User); !user.Admin {
+		if input.StartCommand != nil {
+			writeError(w, http.StatusForbidden, "only the panel's admin can change the start command")
+			return
+		}
+		if limit := a.memoryCap(row); input.MemoryMB != nil && limit > 0 && *input.MemoryMB > limit {
+			writeError(w, http.StatusForbidden, "this server may use at most "+strconv.Itoa(limit)+" MB of memory")
+			return
+		}
+	}
 
 	if input.MemoryMB != nil || input.StartCommand != nil || input.StopCommand != nil || input.JavaOptions != nil {
 		spec, err := serverState(r.Context(), node, row.ID)

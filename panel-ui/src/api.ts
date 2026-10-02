@@ -1,4 +1,12 @@
-export type User = { id: number; username: string; admin: boolean };
+export type Limits = {
+  /** How many servers of their own the account may create. */
+  serverLimit: number;
+  /** The most memory the account may give one server. */
+  memoryLimitMb: number;
+};
+export type User = { id: number; username: string; admin: boolean } & Limits;
+export type Account = User & { servers: number };
+export type UpdateStatus = { current: string; latest: string; available: boolean; notes: string; problem: string };
 export type PanelState = { setupNeeded: boolean; version: string; user: User | null; signupAllowed: boolean };
 export type Permission = "console" | "power" | "files" | "plugins" | "players" | "settings" | "backups" | "schedules" | "network" | "activity";
 /** What a server's owner can let an invited person do, in the order it is offered. */
@@ -145,6 +153,14 @@ export const api = {
 
   panelSettings: () => request<PanelSettings>("GET", "/panel"),
   updatePanelSettings: (patch: { signup?: boolean; remote?: RemoteMode }) => request<PanelSettings>("POST", "/panel", patch),
+
+  update: () => request<UpdateStatus>("GET", "/update"),
+  installUpdate: () => request<void>("POST", "/update", {}),
+
+  accounts: () => request<{ accounts: Account[]; newAccounts: Limits }>("GET", "/accounts"),
+  setAccountLimits: (userId: number, limits: Limits) => request<void>("PATCH", `/accounts/${userId}`, limits),
+  setNewAccountLimits: (limits: Limits) => request<void>("POST", "/accounts/defaults", limits),
+  deleteAccount: (userId: number) => request<void>("DELETE", `/accounts/${userId}`),
 
   members: (id: string) => request<Member[]>("GET", `/servers/${id}/users`),
   invite: (id: string, username: string, permissions: Permission[]) => request<Member>("POST", `/servers/${id}/users`, { username, permissions }),

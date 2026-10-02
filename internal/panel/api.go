@@ -34,6 +34,7 @@ type App struct {
 	store   *Store
 	version string
 	remote  remoteAccess
+	updates updater
 }
 
 func New(store *Store, version string) *App { return &App{store: store, version: version} }
@@ -52,7 +53,7 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("DELETE /api/nodes/{id}", a.admin(a.handleDeleteNode))
 
 	mux.Handle("GET /api/servers", a.authed(a.handleServers))
-	mux.Handle("POST /api/servers", a.admin(a.handleCreateServer))
+	mux.Handle("POST /api/servers", a.authed(a.handleCreateServer))
 	mux.Handle("DELETE /api/servers/{id}", a.onServer("owner", a.handleDeleteServer))
 	mux.Handle("PATCH /api/servers/{id}", a.onServer("settings", a.handleUpdateServer))
 	mux.Handle("POST /api/servers/{id}/minecraft/version", a.onServer("settings", a.handleSwitchVersion))
@@ -78,6 +79,12 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("DELETE /api/servers/{id}/users/{uid}", a.onServer(ownerOnly, a.handleRemoveMember))
 
 	mux.Handle("GET /api/panel", a.admin(a.handlePanelSettings))
+	mux.Handle("GET /api/update", a.admin(a.handleUpdateStatus))
+	mux.Handle("POST /api/update", a.admin(a.handleInstallUpdate))
+	mux.Handle("GET /api/accounts", a.admin(a.handleAccounts))
+	mux.Handle("POST /api/accounts/defaults", a.admin(a.handleNewAccountLimits))
+	mux.Handle("PATCH /api/accounts/{uid}", a.admin(a.handleUpdateAccount))
+	mux.Handle("DELETE /api/accounts/{uid}", a.admin(a.handleDeleteAccount))
 	mux.Handle("POST /api/panel", a.admin(a.handleUpdatePanelSettings))
 
 	mux.Handle("GET /api/minecraft/software", a.authed(a.handleMinecraftSoftware))
@@ -443,6 +450,36 @@ func (a *App) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "give the server a name")
 		return
 	}
+	creator, _ := r.Context().Value(userKey).(User)
+	if !creator.Admin {
+		// Someone other than the admin: only within the allowance the admin gave them,
+		// only Minecraft, and on the first machine.
+		owned, err := a.store.OwnedServers(creator.ID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		switch {
+		case creator.ServerLimit == 0:
+			writeError(w, http.StatusForbidden, "your account is not allowed to create servers. Ask the panel's admin")
+			return
+		case owned >= creator.ServerLimit:
+			writeError(w, http.StatusForbidden, "you already have "+strconv.Itoa(owned)+" of the "+strconv.Itoa(creator.ServerLimit)+" servers your account may create")
+			return
+		case input.Minecraft == nil:
+			writeError(w, http.StatusForbidden, "only the panel's admin can create a server with a custom command")
+			return
+		case input.Minecraft.MemoryMB > creator.MemoryLimitMB:
+			writeError(w, http.StatusForbidden, "your account may give a server at most "+strconv.Itoa(creator.MemoryLimitMB)+" MB of memory")
+			return
+		}
+		nodes, err := a.store.Nodes()
+		if err != nil || len(nodes) == 0 {
+			writeError(w, http.StatusConflict, "this panel has no machine to run servers on yet")
+			return
+		}
+		input.NodeID = nodes[0].ID
+	}
 	node, err := a.store.Node(input.NodeID)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "choose a node for this server")
@@ -454,7 +491,6 @@ func (a *App) handleCreateServer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	creator, _ := r.Context().Value(userKey).(User)
 	row := ServerRow{ID: id, Name: input.Name, NodeID: node.ID, OwnerID: creator.ID}
 	var spec daemonSpec
 	var download minecraft.Download

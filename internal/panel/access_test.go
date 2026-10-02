@@ -178,3 +178,84 @@ func TestLimiter(t *testing.T) {
 		t.Fatal("the lock should lift once the window has passed")
 	}
 }
+
+func TestAccountLimits(t *testing.T) {
+	store, err := OpenStore(filepath.Join(t.TempDir(), "panel.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	panel := httptest.NewServer(New(store, "test").Handler())
+	defer panel.Close()
+	signedIn := func() client {
+		jar, _ := cookiejar.New(nil)
+		return client{t: t, base: panel.URL, http: &http.Client{Jar: jar}}
+	}
+	admin, guest := signedIn(), signedIn()
+	admin.do("POST", "/api/setup", map[string]string{"username": "admin", "password": "correct horse battery"}, nil)
+	var who User
+	guest.do("POST", "/api/signup", map[string]string{"username": "guest", "password": "a long guest password"}, &who)
+	if who.ServerLimit != 0 || who.MemoryLimitMB != defaultMemoryMB {
+		t.Fatalf("a new account got limits %d servers, %d MB", who.ServerLimit, who.MemoryLimitMB)
+	}
+
+	minecraft := func(memory int) map[string]any {
+		return map[string]any{"name": "Mine", "minecraft": map[string]any{"software": "paper", "version": "1.21.4", "memoryMb": memory, "acceptEula": true}}
+	}
+	var reply struct {
+		Error string `json:"error"`
+	}
+	if code := guest.do("POST", "/api/servers", minecraft(2048), &reply); code != http.StatusForbidden {
+		t.Fatalf("creating with no allowance got %d, want 403", code)
+	}
+
+	account := "/api/accounts/" + itoa(who.ID)
+	if code := guest.do("PATCH", account, map[string]int{"serverLimit": 5, "memoryLimitMb": 8192}, nil); code != http.StatusForbidden {
+		t.Errorf("guest raising their own limit got %d, want 403", code)
+	}
+	if code := admin.do("PATCH", account, map[string]int{"serverLimit": 1, "memoryLimitMb": 100}, nil); code != http.StatusBadRequest {
+		t.Errorf("too little memory got %d, want 400", code)
+	}
+	if code := admin.do("PATCH", account, map[string]int{"serverLimit": 1, "memoryLimitMb": 2048}, nil); code != http.StatusNoContent {
+		t.Fatalf("setting limits got %d, want 204", code)
+	}
+
+	// Within the allowance, the request gets past the checks; here it stops because the panel has no machine.
+	if code := guest.do("POST", "/api/servers", map[string]any{"name": "Shell", "startCommand": "cmd"}, &reply); code != http.StatusForbidden {
+		t.Errorf("guest creating a custom-command server got %d, want 403", code)
+	}
+	if code := guest.do("POST", "/api/servers", minecraft(4096), &reply); code != http.StatusForbidden {
+		t.Errorf("guest asking for too much memory got %d, want 403", code)
+	}
+	if code := guest.do("POST", "/api/servers", minecraft(2048), &reply); code != http.StatusConflict {
+		t.Errorf("guest within the allowance got %d (%s), want 409 for the missing machine", code, reply.Error)
+	}
+
+	var list struct {
+		Accounts []Account `json:"accounts"`
+	}
+	admin.do("GET", "/api/accounts", nil, &list)
+	if len(list.Accounts) != 2 || !list.Accounts[0].Admin || list.Accounts[1].ServerLimit != 1 {
+		t.Fatalf("accounts list: %+v", list.Accounts)
+	}
+
+	// New accounts pick up the defaults the admin chose.
+	if code := admin.do("POST", "/api/accounts/defaults", map[string]int{"serverLimit": 2, "memoryLimitMb": 1024}, nil); code != http.StatusNoContent {
+		t.Fatalf("setting defaults got %d, want 204", code)
+	}
+	var second User
+	signedIn().do("POST", "/api/signup", map[string]string{"username": "second", "password": "another long password"}, &second)
+	if second.ServerLimit != 2 || second.MemoryLimitMB != 1024 {
+		t.Errorf("second account got limits %d servers, %d MB; want 2 and 1024", second.ServerLimit, second.MemoryLimitMB)
+	}
+
+	if code := admin.do("DELETE", "/api/accounts/1", nil, nil); code != http.StatusConflict {
+		t.Errorf("removing the admin got %d, want 409", code)
+	}
+	if code := admin.do("DELETE", account, nil, nil); code != http.StatusNoContent {
+		t.Fatalf("removing an account got %d, want 204", code)
+	}
+	if code := guest.do("GET", "/api/servers", nil, nil); code != http.StatusUnauthorized {
+		t.Errorf("a removed account's session got %d, want 401", code)
+	}
+}

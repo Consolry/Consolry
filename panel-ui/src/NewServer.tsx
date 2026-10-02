@@ -1,10 +1,15 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { api, type NodeInfo, type Software } from "./api";
+import { api, type NodeInfo, type Software, type User } from "./api";
 import { Empty, ErrorNote } from "./ui";
 
 const memoryChoices = [1, 2, 4, 6, 8, 12, 16];
 
-export default function NewServer({ nodes, onCreated }: { nodes: NodeInfo[]; onCreated: (id: string, warning: string) => void }) {
+type Props = { nodes: NodeInfo[]; user: User; onCreated: (id: string, warning: string) => void };
+
+export default function NewServer({ nodes, user, onCreated }: Props) {
+  // Anyone but the admin gets Minecraft only, on the first machine, within their memory allowance.
+  const admin = user.admin;
+  const sizes = memoryChoices.filter((gb) => admin || gb * 1024 <= user.memoryLimitMb);
   const [mode, setMode] = useState<"minecraft" | "custom">("minecraft");
   const [name, setName] = useState("");
   const [nodeId, setNodeId] = useState(nodes[0]?.id ?? 0);
@@ -12,7 +17,7 @@ export default function NewServer({ nodes, onCreated }: { nodes: NodeInfo[]; onC
   const [software, setSoftware] = useState("paper");
   const [versions, setVersions] = useState<string[] | null>(null);
   const [version, setVersion] = useState("");
-  const [memory, setMemory] = useState(2);
+  const [memory, setMemory] = useState(sizes.includes(2) ? 2 : (sizes[0] ?? 1));
   const [eula, setEula] = useState(false);
   const [startCommand, setStartCommand] = useState("");
   const [stopCommand, setStopCommand] = useState("");
@@ -39,7 +44,7 @@ export default function NewServer({ nodes, onCreated }: { nodes: NodeInfo[]; onC
     };
   }, [software]);
 
-  if (nodes.length === 0) {
+  if (admin && nodes.length === 0) {
     return (
       <Empty title="Add a node first" action={<a className="button primary" href="#/nodes">Add a node</a>}>
         A server needs a node to run on.
@@ -52,7 +57,7 @@ export default function NewServer({ nodes, onCreated }: { nodes: NodeInfo[]; onC
     setBusy(true);
     setError("");
     try {
-      const target = nodeId || nodes[0].id;
+      const target = nodeId || nodes[0]?.id || 0;
       const result = await api.createServer(
         mode === "minecraft"
           ? { name, nodeId: target, minecraft: { software, version, memoryMb: memory * 1024, acceptEula: eula } }
@@ -71,7 +76,7 @@ export default function NewServer({ nodes, onCreated }: { nodes: NodeInfo[]; onC
         <h1>New server</h1>
       </header>
 
-      <div className="tabs" role="tablist" aria-label="Kind of server">
+      <div className="tabs" role="tablist" aria-label="Kind of server" hidden={!admin}>
         <button role="tab" aria-selected={mode === "minecraft"} onClick={() => setMode("minecraft")}>
           Minecraft
         </button>
@@ -123,7 +128,7 @@ export default function NewServer({ nodes, onCreated }: { nodes: NodeInfo[]; onC
               <label>
                 Memory
                 <select value={memory} onChange={(event) => setMemory(Number(event.target.value))}>
-                  {memoryChoices.map((gb) => (
+                  {sizes.map((gb) => (
                     <option key={gb} value={gb}>
                       {gb} GB
                     </option>

@@ -1850,3 +1850,29 @@ section.card.form {
   display: grid;
   gap: 16px;
 }
+
+.limits {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px 18px;
+}
+
+.limits label {
+  flex: 0 1 220px;
+}
+
+.note.update {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.note.update p {
+  margin: 0;
+}
+
+.note.update a {
+  color: var(--accent);
+}

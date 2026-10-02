@@ -77,6 +77,10 @@ type User struct {
 	Username string `json:"username"`
 	// Admin is the account that set the panel up. It manages the panel itself and can open every server.
 	Admin bool `json:"admin"`
+	// ServerLimit is how many servers of their own this account may create. The admin has no limit.
+	ServerLimit int `json:"serverLimit"`
+	// MemoryLimitMB is the most memory this account may give one of its servers.
+	MemoryLimitMB int `json:"memoryLimitMb"`
 }
 
 type Node struct {
@@ -116,6 +120,8 @@ func OpenStore(path string) (*Store, error) {
 		"servers ADD COLUMN forward TEXT NOT NULL DEFAULT ''",
 		"servers ADD COLUMN owner_id INTEGER NOT NULL DEFAULT 0",
 		"users ADD COLUMN admin INTEGER NOT NULL DEFAULT 0",
+		"users ADD COLUMN server_limit INTEGER NOT NULL DEFAULT 0",
+		"users ADD COLUMN memory_limit_mb INTEGER NOT NULL DEFAULT 4096",
 	} {
 		if _, err := db.Exec("ALTER TABLE " + column); err != nil && !strings.Contains(err.Error(), "duplicate column") {
 			db.Close()
@@ -152,9 +158,12 @@ func (s *Store) CreateUser(username, password string) (User, error) {
 	if err != nil {
 		return User{}, err
 	}
-	user := User{ID: id, Username: username}
-	err = s.db.QueryRow(`SELECT admin FROM users WHERE id = ?`, id).Scan(&user.Admin)
-	return user, err
+	if servers, memory := s.newAccountLimits(); memory > 0 {
+		if err := s.SetLimits(id, servers, memory); err != nil {
+			return User{}, err
+		}
+	}
+	return s.UserByID(id)
 }
 
 var errBadLogin = errors.New("wrong username or password")
@@ -164,8 +173,8 @@ var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("consolry"), bcrypt.Defaul
 func (s *Store) CheckPassword(username, password string) (User, error) {
 	var user User
 	var hash string
-	err := s.db.QueryRow(`SELECT id, username, admin, password_hash FROM users WHERE username = ? COLLATE NOCASE`, username).
-		Scan(&user.ID, &user.Username, &user.Admin, &hash)
+	err := s.db.QueryRow(`SELECT id, username, admin, server_limit, memory_limit_mb, password_hash FROM users WHERE username = ? COLLATE NOCASE`, username).
+		Scan(&user.ID, &user.Username, &user.Admin, &user.ServerLimit, &user.MemoryLimitMB, &hash)
 	if errors.Is(err, sql.ErrNoRows) {
 		// Hash anyway so a wrong username takes as long as a wrong password.
 		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
@@ -200,10 +209,10 @@ func (s *Store) NewSession(userID int64) (string, error) {
 func (s *Store) SessionUser(token string) (User, error) {
 	var user User
 	err := s.db.QueryRow(`
-		SELECT users.id, users.username, users.admin FROM sessions
+		SELECT users.id, users.username, users.admin, users.server_limit, users.memory_limit_mb FROM sessions
 		JOIN users ON users.id = sessions.user_id
 		WHERE sessions.token_hash = ? AND sessions.expires_at > ?`,
-		hashToken(token), time.Now().Unix()).Scan(&user.ID, &user.Username, &user.Admin)
+		hashToken(token), time.Now().Unix()).Scan(&user.ID, &user.Username, &user.Admin, &user.ServerLimit, &user.MemoryLimitMB)
 	return user, err
 }
 

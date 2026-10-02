@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Access from "./Access";
+import Accounts from "./Accounts";
 import { api, isLive, stateLabel, uptime, type NodeInfo, type PanelState, type ServerInfo, type User } from "./api";
 import NewServer from "./NewServer";
 import type { UsageHistory } from "./Dashboard";
 import ServerPage, { type Tab } from "./ServerPage";
 import { Empty, ErrorNote, useAction } from "./ui";
+import UpdateBanner from "./Update";
 
-type View = { kind: "overview" } | { kind: "server"; id: string; tab: Tab } | { kind: "new-server" } | { kind: "nodes" } | { kind: "access" };
+type View = { kind: "overview" } | { kind: "server"; id: string; tab: Tab } | { kind: "new-server" } | { kind: "nodes" } | { kind: "access" } | { kind: "accounts" };
 
 // The address after # decides the page, so a refresh or a shared link lands in the same place.
 function parseHash(hash: string): View {
@@ -15,6 +17,7 @@ function parseHash(hash: string): View {
   if (parts[0] === "new") return { kind: "new-server" };
   if (parts[0] === "nodes") return { kind: "nodes" };
   if (parts[0] === "access") return { kind: "access" };
+  if (parts[0] === "accounts") return { kind: "accounts" };
   return { kind: "overview" };
 }
 
@@ -215,9 +218,13 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
 
   if (!servers || !nodes) return null;
 
+  // The admin can always create servers; anyone else only up to the number the admin allowed them.
+  const owned = servers.filter((server) => server.owner).length;
+  const canCreate = admin || owned < user.serverLimit;
+
   const selected = view.kind === "server" ? servers.find((server) => server.id === view.id) : undefined;
   const crumb =
-    view.kind === "server" ? (selected?.name ?? "Unknown server") : view.kind === "new-server" ? "New server" : view.kind === "nodes" ? "Nodes" : view.kind === "access" ? "Remote access" : "Overview";
+    view.kind === "server" ? (selected?.name ?? "Unknown server") : view.kind === "new-server" ? "New server" : view.kind === "nodes" ? "Nodes" : view.kind === "access" ? "Remote access" : view.kind === "accounts" ? "Accounts" : "Overview";
 
   return (
     <div className="shell">
@@ -248,6 +255,11 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
             </a>
           )}
           {admin && (
+            <a href="#/accounts" className={view.kind === "accounts" ? "on" : undefined}>
+              Accounts
+            </a>
+          )}
+          {admin && (
             <a href="#/access" className={view.kind === "access" ? "on" : undefined}>
               Remote access
             </a>
@@ -266,7 +278,7 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
           ))}
           {servers.length === 0 && <p className="dim empty">None yet.</p>}
         </nav>
-        {admin && (
+        {canCreate && (
           <a href="#/new" className={view.kind === "new-server" ? "add on" : "add"}>
             + New server
           </a>
@@ -274,6 +286,7 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
       </aside>
 
       <main className="content">
+        {admin && <UpdateBanner />}
         {warning && (
           <p className="note warn">
             {warning}{" "}
@@ -282,7 +295,7 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
             </button>
           </p>
         )}
-        {view.kind === "overview" && <Overview servers={servers} nodes={nodes} now={now} user={user} onChanged={loadServers} />}
+        {view.kind === "overview" && <Overview servers={servers} nodes={nodes} now={now} user={user} canCreate={canCreate} onChanged={loadServers} />}
         {view.kind === "server" && selected && (
           <ServerPage
             key={selected.id}
@@ -302,9 +315,15 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
             It may have been removed.
           </Empty>
         )}
-        {view.kind === "new-server" && admin && (
+        {view.kind === "new-server" && !canCreate && (
+          <Empty title="You can't create a server" action={<a className="button" href="#/">Back to overview</a>}>
+            {user.serverLimit > 0 ? `Your account may create ${user.serverLimit}, and you already have that many.` : "Ask the panel's admin to allow it for your account."}
+          </Empty>
+        )}
+        {view.kind === "new-server" && canCreate && (
           <NewServer
             nodes={nodes}
+            user={user}
             onCreated={(id, note) => {
               setWarning(note);
               loadServers().then(() => {
@@ -315,18 +334,41 @@ function Panel({ user, version, onSignOut }: { user: User; version: string; onSi
         )}
         {view.kind === "nodes" && admin && <Nodes nodes={nodes} onChanged={loadNodes} />}
         {view.kind === "access" && admin && <Access />}
+        {view.kind === "accounts" && admin && <Accounts />}
       </main>
     </div>
   );
 }
 
-function Overview({ servers, nodes, now, user, onChanged }: { servers: ServerInfo[]; nodes: NodeInfo[]; now: number; user: User; onChanged: () => void }) {
+function Overview({
+  servers,
+  nodes,
+  now,
+  user,
+  canCreate,
+  onChanged,
+}: {
+  servers: ServerInfo[];
+  nodes: NodeInfo[];
+  now: number;
+  user: User;
+  canCreate: boolean;
+  onChanged: () => void;
+}) {
   const admin = user.admin;
   const { error, run } = useAction();
   const power = (id: string, action: "start" | "stop") => run(action, () => api.power(id, action), onChanged);
   const running = servers.filter((server) => server.state === "running").length;
   const trouble = servers.filter((server) => server.state === "crashed" || server.state === "unreachable").length;
   const online = nodes.filter((node) => node.online).length;
+
+  if (!admin && servers.length === 0 && canCreate) {
+    return (
+      <Empty title="No servers yet" action={<a className="button primary" href="#/new">Create a server</a>}>
+        Your account may create {user.serverLimit === 1 ? "one server" : `${user.serverLimit} servers`} of its own.
+      </Empty>
+    );
+  }
 
   if (!admin && servers.length === 0) {
     return (
@@ -348,7 +390,7 @@ function Overview({ servers, nodes, now, user, onChanged }: { servers: ServerInf
     <>
       <header className="page-head">
         <h1>Overview</h1>
-        {admin && (
+        {canCreate && (
           <a className="button primary" href="#/new">
             New server
           </a>
