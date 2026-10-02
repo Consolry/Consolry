@@ -10,7 +10,10 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/DinoNaedYT/Consolry/internal/daemon"
@@ -20,13 +23,19 @@ import (
 
 func main() {
 	listen := flag.String("listen", "127.0.0.1:8700", "address the panel listens on")
-	dbPath := flag.String("db", "consolry.db", "path to the SQLite database file")
-	dataDir := flag.String("data", "daemon-data", "directory for server files, backups and Java")
+	dir := flag.String("dir", "", "folder for all of Consolry's data (default: a Consolry folder in your user profile)")
 	localListen := flag.String("local-daemon", "127.0.0.1:8750", "address the built-in daemon listens on")
 	noLocal := flag.Bool("no-local-daemon", false, "do not run servers on this machine; use only nodes added by hand")
+	noBrowser := flag.Bool("no-browser", false, "do not open the panel in a browser on start")
 	flag.Parse()
 
-	store, err := panel.OpenStore(*dbPath)
+	home, err := dataFolder(*dir)
+	if err != nil {
+		log.Fatalf("could not prepare the data folder: %v", err)
+	}
+	log.Printf("consolry %s, data in %s", version.Version, home)
+
+	store, err := panel.OpenStore(filepath.Join(home, "consolry.db"))
 	if err != nil {
 		log.Fatalf("could not open database: %v", err)
 	}
@@ -36,16 +45,20 @@ func main() {
 	defer stop()
 
 	if !*noLocal {
-		shutdown := startLocalDaemon(store, *localListen, *dataDir)
+		shutdown := startLocalDaemon(store, *localListen, filepath.Join(home, "daemon-data"))
 		defer shutdown()
 	}
 
 	app := panel.New(store, version.Version)
 	app.StartScheduler(ctx)
-	server := &http.Server{
-		Addr:              *listen,
-		Handler:           app.Handler(),
-		ReadHeaderTimeout: 10 * time.Second,
+	server := &http.Server{Handler: app.Handler(), ReadHeaderTimeout: 10 * time.Second}
+
+	// Listen before announcing, so a second copy fails clearly instead of opening a dead page.
+	listener, err := net.Listen("tcp", *listen)
+	if err != nil {
+		log.Printf("could not start on %s: %v", *listen, err)
+		log.Print("Consolry may already be running. Open http://" + *listen + " in your browser.")
+		return
 	}
 	go func() {
 		<-ctx.Done()
@@ -54,10 +67,54 @@ func main() {
 		_ = server.Shutdown(shutdown)
 	}()
 
-	log.Printf("consolry %s is ready: open http://%s in your browser", version.Version, *listen)
-	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	address := "http://" + *listen
+	log.Printf("ready: open %s in your browser. Keep this window open; press Ctrl+C to stop.", address)
+	if !*noBrowser {
+		openBrowser(address)
+	}
+	if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Print(err)
 	}
+}
+
+// dataFolder decides where Consolry keeps its database, servers and backups.
+// A folder that already holds data wins, so an existing install keeps working wherever it was started.
+func dataFolder(chosen string) (string, error) {
+	if chosen == "" {
+		if _, err := os.Stat("consolry.db"); err == nil {
+			chosen = "."
+		} else if runtime.GOOS == "windows" && os.Getenv("LOCALAPPDATA") != "" {
+			chosen = filepath.Join(os.Getenv("LOCALAPPDATA"), "Consolry")
+		} else if data := os.Getenv("XDG_DATA_HOME"); data != "" {
+			chosen = filepath.Join(data, "consolry")
+		} else if user, err := os.UserHomeDir(); err == nil {
+			chosen = filepath.Join(user, ".local", "share", "consolry")
+		} else {
+			chosen = "."
+		}
+	}
+	absolute, err := filepath.Abs(chosen)
+	if err != nil {
+		return "", err
+	}
+	return absolute, os.MkdirAll(absolute, 0o755)
+}
+
+// openBrowser shows the panel on a desktop machine. On a server with no desktop it quietly does nothing.
+func openBrowser(address string) {
+	var command *exec.Cmd
+	switch runtime.GOOS {
+	case "windows":
+		command = exec.Command("rundll32", "url.dll,FileProtocolHandler", address)
+	case "darwin":
+		command = exec.Command("open", address)
+	default:
+		if os.Getenv("DISPLAY") == "" && os.Getenv("WAYLAND_DISPLAY") == "" {
+			return
+		}
+		command = exec.Command("xdg-open", address)
+	}
+	_ = command.Start()
 }
 
 // startLocalDaemon runs the daemon inside this program and registers it as the node

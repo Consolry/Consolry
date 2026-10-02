@@ -3,7 +3,7 @@ import Layout from "./components/Layout";
 import { routes, site } from "./content";
 import Features from "./pages/Features";
 import Home from "./pages/Home";
-import { FaqPage, NotFound, PricingPage, RoadmapPage } from "./pages/Other";
+import { DownloadPage, FaqPage, NotFound, PricingPage, RoadmapPage } from "./pages/Other";
 
 export function normalise(pathname: string) {
   return pathname.replace(/\/+$/, "") || "/";
@@ -12,6 +12,7 @@ export function normalise(pathname: string) {
 const pages: Record<string, () => React.JSX.Element> = {
   "/": Home,
   "/features": Features,
+  "/download": DownloadPage,
   "/pricing": PricingPage,
   "/roadmap": RoadmapPage,
   "/faq": FaqPage,

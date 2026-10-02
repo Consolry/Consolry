@@ -19,8 +19,8 @@ export default function Home() {
               which are out of date, and why the server just crashed.
             </p>
             <div className="actions">
-              <a href="#waitlist" className="button">
-                Join the waitlist
+              <a href="/download" className="button">
+                Download the preview
               </a>
               <a href="/features" className="button ghost">
                 See the features

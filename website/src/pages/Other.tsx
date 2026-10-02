@@ -1,6 +1,6 @@
 import { PageHead, Section } from "../components/Layout";
 import Pricing from "../components/Pricing";
-import { faqs, firstRelease, stages } from "../content";
+import { faqs, firstRelease, site, stages } from "../content";
 
 function FaqList({ items }: { items: typeof faqs }) {
   return (
@@ -60,8 +60,8 @@ export function RoadmapPage() {
     <>
       <PageHead
         label="Roadmap"
-        title="Nothing is released yet"
-        intro="Consolry is being built in the order below, and this site is the first piece. There is no release date, and we would rather say that than guess."
+        title="An early preview is out"
+        intro="Consolry is being built in the order below. The early preview already runs real Minecraft servers; the first full release has no date yet, and we would rather say that than guess."
       />
       <Section alt label="Build order" title="Eight stages, one at a time">
         <ol className="timeline">
@@ -97,6 +97,81 @@ export function RoadmapPage() {
             ))}
           </tbody>
         </table>
+      </Section>
+    </>
+  );
+}
+
+const exe = `${site.github}/releases/latest/download/Consolry.exe`;
+const installCommand = "curl -fsSL https://www.consolry.com/install.sh | sh";
+
+export function DownloadPage() {
+  return (
+    <>
+      <PageHead
+        label="Download"
+        title="Install Consolry on your own machine"
+        intro="This is an early preview. It runs real Minecraft servers, but it is unfinished: expect bugs, and keep your own backups of anything important."
+      />
+
+      <section className="section alt">
+        <div className="wrap downloads">
+          <article>
+            <p className="pixel">Windows 10 and 11</p>
+            <h2>Windows</h2>
+            <a className="button" href={exe}>
+              Download Consolry.exe
+            </a>
+            <ol className="steps">
+              <li>Run the file you downloaded. A window opens and your browser shows the panel.</li>
+              <li>Create your admin account.</li>
+              <li>Create a server. Consolry downloads Minecraft and the right Java for you.</li>
+            </ol>
+            <p className="fine">
+              Windows may say it "protected your PC", because the preview is not yet signed. Choose <strong>More info</strong>, then{" "}
+              <strong>Run anyway</strong>. Keep the window open while your servers run.
+            </p>
+          </article>
+
+          <article>
+            <p className="pixel">64-bit Intel, AMD and ARM</p>
+            <h2>Linux</h2>
+            <pre className="command">
+              <code>{installCommand}</code>
+            </pre>
+            <ol className="steps">
+              <li>Paste the command into a terminal. It installs one program, <code>consolry</code>, and checks the download first.</li>
+              <li>
+                Start it by typing <code>consolry</code>.
+              </li>
+              <li>Open http://127.0.0.1:8700 in a browser on that machine and create your admin account.</li>
+            </ol>
+            <p className="fine">
+              No screen on that machine? From your own computer run <code>ssh -L 8700:127.0.0.1:8700 you@your-server</code>, then open the same address
+              locally.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <Section label="Good to know" title="Before you start">
+        <dl className="basics">
+          <div>
+            <dt>It runs on your machine</dt>
+            <dd>The panel, your servers, worlds and backups all stay on the computer you install it on.</dd>
+          </div>
+          <div>
+            <dt>Friends joining</dt>
+            <dd>To let people outside your home join, forward the server's port (usually 25565) on your router. Consolry does not do this for you yet.</dd>
+          </div>
+          <div>
+            <dt>Keep the panel private</dt>
+            <dd>The panel only answers on your own machine. Do not open it to the internet in this preview.</dd>
+          </div>
+        </dl>
+        <p className="more">
+          <a href={`${site.github}/releases`}>All versions and release notes</a>
+        </p>
       </Section>
     </>
   );

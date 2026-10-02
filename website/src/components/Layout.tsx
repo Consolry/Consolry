@@ -24,8 +24,8 @@ export default function Layout({ path, children }: { path: string; children: Rea
       </a>
 
       <p className="announce">
-        <span className="pixel">Pre-release</span>
-        Consolry is being built in the open. <a href={site.github}>Follow on GitHub</a>
+        <span className="pixel">Early preview</span>
+        Consolry now runs real Minecraft servers on Windows and Linux. <a href="/download">Download it</a>
       </p>
 
       <header className="site-header">

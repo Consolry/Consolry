@@ -42,6 +42,12 @@ export const routes = [
       "Plugin manager, crash explainer, config forms and version switcher, on top of a proper console, file manager and backups.",
   },
   {
+    path: "/download",
+    nav: "Download",
+    title: "Download | Consolry",
+    description: "Download the Consolry early preview: an .exe for Windows, or one command to install on Linux.",
+  },
+  {
     path: "/pricing",
     nav: "Pricing",
     title: "Pricing | Consolry",
@@ -239,10 +245,10 @@ export const pricingNotes = [
 ];
 
 export const stages = [
-  { name: "Foundations", detail: "This site, the repository and the build setup.", status: "In progress" },
-  { name: "Daemon and core panel", detail: "Create, start and manage a server on Windows and Linux.", status: "Next" },
-  { name: "Everyday basics", detail: "Backups, schedules, notifications and two-factor login.", status: "Planned" },
-  { name: "Minecraft module", detail: "Plugin manager, version switcher, crash explainer, config forms.", status: "First release" },
+  { name: "Foundations", detail: "This site, the repository and the build setup.", status: "Done" },
+  { name: "Daemon and core panel", detail: "Create, start and manage a server on Windows and Linux.", status: "Done" },
+  { name: "Everyday basics", detail: "Backups and schedules are in. Notifications and two-factor login are next.", status: "In progress" },
+  { name: "Minecraft module", detail: "Plugins, version switching, crash explainer and game settings are in. Plugin config forms are next.", status: "In progress" },
   { name: "Consolry Home", detail: "Single-PC mode, automatic port forwarding, Pterodactyl importer.", status: "Planned" },
   { name: "Safe upgrades", detail: "Upgrade planner and staging clones. The Plus plan opens.", status: "Planned" },
   { name: "Networks and teams", detail: "Networks, templates, sleep mode, status pages. The Pro plan opens.", status: "Planned" },
@@ -266,7 +272,7 @@ export const faqs = [
   },
   {
     q: "Can I use it yet?",
-    a: "No. Consolry is in development and nothing has been released. Join the waitlist and you'll get one email when the first release is ready.",
+    a: "Yes, as an early preview for Windows and Linux, from the Download page. It is unfinished: expect bugs and missing features, and keep your own backups of anything important. Join the waitlist for one email when the first full release is ready.",
   },
   {
     q: "Can I run it on Windows without Docker?",

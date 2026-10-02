@@ -1,0 +1,62 @@
+# Builds Consolry for Windows and Linux and attaches the files to a GitHub release.
+# Runs when a version tag such as v0.1.0 is pushed.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: panel-ui/package-lock.json
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build the panel interface
+        working-directory: panel-ui
+        run: |
+          npm ci
+          npm run build
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build for each platform
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          flags="-s -w -X github.com/DinoNaedYT/Consolry/internal/version.Version=${version}"
+          mkdir dist
+          build() { # os arch extension
+            GOOS=$1 GOARCH=$2 go build -trimpath -ldflags "$flags" -o "dist/consolry-$1-$2$3" ./cmd/consolry
+            GOOS=$1 GOARCH=$2 go build -trimpath -ldflags "$flags" -o "dist/consolry-daemon-$1-$2$3" ./cmd/consolry-daemon
+          }
+          build windows amd64 .exe
+          build linux amd64 ""
+          build linux arm64 ""
+          # The plain name Windows users download.
+          cp dist/consolry-windows-amd64.exe dist/Consolry.exe
+          (cd dist && sha256sum * > checksums.txt)
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "Consolry ${GITHUB_REF_NAME#v}" \
+            --generate-notes \
+            --prerelease
