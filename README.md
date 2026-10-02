@@ -4,8 +4,8 @@ A game server panel that knows your game. Pre-release: this repository holds the
 
 ## What works today
 
-- **Daemon** (): runs servers as processes on Windows or Linux, keeps their console history, stops them cleanly, manages their files and takes backups.
-- **Panel** (): first-run admin account, sign-in, nodes, servers, start/stop/kill, and a live searchable console in the browser.
+- **Daemon** (`consolry-daemon`): runs servers as processes on Windows or Linux, keeps their console history, stops them cleanly, manages their files and takes backups.
+- **Panel** (`consolry`): first-run admin account, sign-in, nodes, servers, start/stop/kill, and a live searchable console in the browser.
 - **Files**: browse, edit, upload, download, rename and delete, confined to each server's own folder.
 - **Backups**: zip the whole server folder, restore, download or delete.
 - **Minecraft**: create a Paper, Purpur or Fabric server by picking a version; the server jar is downloaded and checked for you.
