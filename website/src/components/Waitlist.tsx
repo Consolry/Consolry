@@ -1,38 +1,32 @@
-import { useId, useState, type FormEvent } from "react";
+import { useEffect, useRef } from "react";
 import { site } from "../content";
 
-// EmailOctopus's sign-up form. Submitting opens EmailOctopus's own confirmation
-// page in a new tab, which also handles the "check your inbox" step.
-const action = site.emailOctopusFormId ? `https://eocampaign1.com/form/${site.emailOctopusFormId}` : undefined;
-
+// EmailOctopus draws the sign-up form itself, including its hidden spam check, so its
+// look is set in the EmailOctopus form designer rather than in this site's styles.
 export default function Waitlist() {
-  const inputId = useId();
-  const [status, setStatus] = useState<"idle" | "sent" | "closed">("idle");
+  const holder = useRef<HTMLDivElement>(null);
 
-  function submit(event: FormEvent) {
-    if (!action) {
-      event.preventDefault();
-      setStatus("closed");
-      return;
-    }
-    setStatus("sent");
+  useEffect(() => {
+    const element = holder.current;
+    if (!element || !site.emailOctopusFormId) return;
+    // The script puts the form next to its own tag, so the tag has to sit inside the holder.
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = `https://eocampaign1.com/form/${site.emailOctopusFormId}.js`;
+    script.dataset.form = site.emailOctopusFormId;
+    element.appendChild(script);
+    return () => {
+      element.replaceChildren();
+    };
+  }, []);
+
+  if (!site.emailOctopusFormId) {
+    return <p className="waitlist-note">The waitlist isn't open yet. Check back soon.</p>;
   }
 
   return (
-    <form className="waitlist" action={action} method="post" target="_blank" onSubmit={submit}>
-      <label htmlFor={inputId}>Email address</label>
-      <div className="waitlist-row">
-        <input id={inputId} type="email" name="field_0" required autoComplete="email" placeholder="you@example.com" />
-        <button type="submit" className="button">
-          Join the waitlist
-        </button>
-      </div>
-      {/* EmailOctopus's spam trap: people never see it, and sign-ups that fill it in are dropped. */}
-      <input type="text" name="hpc4b27b6e-eb38-11e9-be00-06b4694bee2a" tabIndex={-1} autoComplete="nope" aria-hidden="true" hidden />
-      <p className="waitlist-note" role="status">
-        {status === "sent" && "Almost done. Confirm in the tab that just opened, then check your inbox."}
-        {status === "closed" && "The waitlist isn't open yet. Check back soon."}
-      </p>
-    </form>
+    <div className="waitlist" ref={holder}>
+      <noscript>Turn on JavaScript to join the waitlist.</noscript>
+    </div>
   );
 }

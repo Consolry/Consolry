@@ -5,9 +5,9 @@ export const site = {
   version: "0.1.0",
   url: "https://www.consolry.com",
   name: "Consolry",
-  // The EmailOctopus form ID: the long code in the form's embed snippet, after "eocampaign1.com/form/".
+  // The EmailOctopus form ID: the long code in the form's embed snippet.
   // Empty means the waitlist is closed.
-  emailOctopusFormId: "",
+  emailOctopusFormId: "cd69d844-be68-11f1-b6f7-f98c6be510fe",
   github: "https://github.com/DinoNaedYT/Consolry",
   maintainer: { name: "DinoNaedYT", url: "https://github.com/DinoNaedYT" },
 };
