@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/DinoNaedYT/Consolry/internal/minecraft"
+	"github.com/Consolry/Consolry/internal/minecraft"
 )
 
 // autoBackupsKept is how many before-a-change backups stay on disk per server.

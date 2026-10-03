@@ -129,6 +129,40 @@ On the same computer, add a server in Minecraft with the address `localhost`. Fo
 
 2 GB is enough for a few friends on a plain server. Add more for many plugins or players, but leave a few GB free for the rest of your computer. You can change it later on the [Startup](/docs/startup) tab.
 
+=== import | Start here | Moving from Pterodactyl | Copy servers from a Pterodactyl panel, with their worlds, plugins and settings.
+
+Consolry can copy servers from a Pterodactyl panel. Nothing on Pterodactyl is changed, so you can check the copy before switching over.
+
+## Before you start
+
+- In Pterodactyl, open **Account**, then **API Credentials**, and create a key. It starts with `ptlc_`. It is used only for the import and is not saved.
+- **Stop the server on Pterodactyl**, so its world is saved and not changing while it is copied.
+- Make sure this computer has room for the server's files.
+
+## Import
+
+1. In Consolry, open **New server** and choose **Import a server**, or go to `#/import` in the panel.
+2. Type your Pterodactyl address and the API key, then press **Show my servers**.
+3. Press **Import** next to a server.
+
+Pterodactyl packs the server's files, Consolry downloads and unpacks them, then the packed copy is deleted from Pterodactyl again. A big world can take several minutes.
+
+## What is carried over
+
+| From Pterodactyl | In Consolry |
+| --- | --- |
+| Every file: world, plugins, settings | The same files in the new server's folder |
+| Memory limit | The server's memory |
+| Java version of the Docker image | The Java version Consolry uses |
+| Paper, Purpur or Fabric egg | A Minecraft server with plugin tools and the version switcher |
+| Any other egg | Pterodactyl's start command, which may need changing on the [Startup](/docs/startup) tab |
+
+Not carried over: Pterodactyl's sub-users, schedules, databases and backups. Share the server again from the [Users tab](/docs/users), and add [schedules](/docs/schedules) here.
+
+## After importing
+
+Start the server and check the console. If the egg said "latest" for the version, Consolry reads the real version from the server's log; when it cannot, it says so and you can pick it under **Settings**.
+
 === console | Managing a server | Console | Watch the server's log live and type commands.
 
 The Console tab shows what the server prints, as it happens, and lets you send commands.
@@ -181,14 +215,34 @@ On Paper and Purpur servers this tab is called **Plugins**. On Fabric servers it
 - A [backup](/docs/backups) is taken first.
 - If the server is running, restart it to load the new plugin.
 
-Plugins come from [Modrinth](https://modrinth.com). A plugin that is not on Modrinth can be uploaded into the `plugins` folder on the [Files](/docs/files) tab.
+## Where plugins come from
+
+Pick a site above the results:
+
+| Site | What it has |
+| --- | --- |
+| [Modrinth](https://modrinth.com) | Plugins and Fabric mods. The default. |
+| [Hangar](https://hangar.papermc.io) | PaperMC's own plugin site. Paper and Purpur only. |
+| [CurseForge](https://www.curseforge.com/minecraft) | Plugins and mods. Needs an API key, see below. |
+
+Every download is checked against the fingerprint the site publishes, and refused if it does not match. A few authors only allow downloads from their own page; those cannot be installed from Consolry. Only full releases are installed or offered as updates, never test builds.
+
+A plugin from anywhere else can be uploaded into the `plugins` folder on the [Files](/docs/files) tab.
+
+## Connecting CurseForge
+
+CurseForge only answers programs that have a key. Keys are free:
+
+1. Sign in at [console.curseforge.com](https://console.curseforge.com) and open **API keys**.
+2. Copy your key.
+3. In Consolry, open any server's **Plugins** tab, choose **CurseForge**, paste the key and press **Save key**. Only the admin can do this, and it is needed once for the whole panel.
 
 ## Installed
 
 **Installed** lists what is in the server's plugins folder.
 
-- **Verified** means the file is exactly what its author published on Modrinth.
-- **Unverified** means Consolry cannot match it. That is normal for plugins from other sites. It is not a sign that the file is harmful, only that it could not be checked.
+- **Verified** means the file is exactly what its author published, and shows which site it came from.
+- **Unverified** means Consolry cannot match it. That is normal for plugins uploaded by hand. It is not a sign that the file is harmful, only that it could not be checked.
 - **Update** appears when a newer version exists for your server.
 - **Remove** deletes the plugin's file. Its settings folder stays.
 
@@ -236,7 +290,20 @@ Stop the server, then press **Restore** on a backup. Every file on the server is
 
 ## Where they are kept
 
-On the same computer, in Consolry's [data folder](/docs/data). That protects you from a bad plugin or a mistake, but not from a failed disk. Press **Download** on a backup to keep a copy somewhere else.
+On the same computer, in Consolry's [data folder](/docs/data). That protects you from a bad plugin or a mistake, but not from a failed disk. Press **Download** on a backup to keep a copy somewhere else, or copy them off-site automatically.
+
+## Off-site copies
+
+Consolry can copy backups to storage that works like Amazon S3: [Backblaze B2](https://www.backblaze.com/cloud-storage), [Cloudflare R2](https://www.cloudflare.com/developer-platform/r2/), Wasabi, Amazon S3, or your own MinIO.
+
+1. The admin opens **Storage** in the menu, fills in the bucket's address, name and keys, and presses **Save and check**. Consolry writes a small test file to make sure the details work.
+2. On a server's **Backups** tab, tick **Copy every backup off-site**.
+
+From then on, every backup taken by hand or by a schedule is copied as soon as it is made, and the oldest copies beyond the number to keep are deleted. Backups taken automatically before a change stay on this computer only. A failed copy is written in the server's activity log, and sent as an [alert](/docs/alerts) if task alerts are on.
+
+The **Off-site copies** list has **Download** and **Restore** for each copy. Restore brings the copy back to this computer, then restores it like any other backup.
+
+> Most providers charge for storage by the gigabyte. A Minecraft world is usually a few hundred megabytes; check how big your backups are before choosing how many to keep.
 
 Folders that Minecraft downloads again by itself, such as `libraries` and `cache`, are left out to keep backups small.
 
@@ -288,6 +355,36 @@ Consolry reopens the port each time the server starts. **Close the port** remove
 ## Changing the port
 
 Stop the server, enter a new port, and save. Use a different port for each server you run at the same time.
+
+=== alerts | Managing a server | Alerts | Get a message in Discord or by email when something happens to a server.
+
+Each server's owner chooses its alerts on the server's **Alerts** tab.
+
+## Where alerts go
+
+- **Discord:** in your Discord server, open **Server settings**, **Integrations**, **Webhooks**, make a **New webhook** for a channel, and **Copy webhook URL**. Paste it into Consolry.
+- **Email:** type up to five addresses. Email needs the panel's mail server, which the admin sets up once (see below).
+
+Press **Save and send a test** to check it works.
+
+## What you can be told about
+
+| Choice | When |
+| --- | --- |
+| It crashes | The server stops without being asked to. The message includes what went wrong when the [crash explainer](/docs/troubleshooting) recognises it. |
+| A scheduled task fails | A backup, restart or command from a [schedule](/docs/schedules) did not work, or a backup could not be copied off-site. |
+| It starts | The server is ready for players. |
+| It is stopped | Someone, or a schedule, stopped it. |
+
+Crashes and failed tasks are on from the start; the other two are off.
+
+## Setting up email (admin)
+
+Open **Alerts** in the menu and fill in **Mail server** with the details of an email account you already have. For Gmail, use `smtp.gmail.com`, port `587`, your address, and an [app password](https://myaccount.google.com/apppasswords) rather than your normal password. Services such as Brevo or Mailgun also work.
+
+## Alerts about the panel (admin)
+
+The same page has alerts for the panel itself: when a new version of Consolry is out, and when a machine stops answering for more than a minute.
 
 === startup | Managing a server | Startup | Memory, Java options and how the server is launched.
 
@@ -351,6 +448,31 @@ They cannot delete the server, invite others, add machines or change the panel's
 ## Stop new sign-ups
 
 Once everyone has an account, the admin can untick **Let people create their own account** on the **Remote access** page. A new account can do nothing until a server is shared with it.
+
+=== account-security | Running Consolry | Passwords and two-factor login | Change your password, and protect your account with a code from your phone.
+
+Click your name at the top right of the panel to open **Your account**.
+
+## Change your password
+
+Type your current password and a new one of at least 10 characters. Every other device signed in to your account is signed out.
+
+## Two-factor login
+
+With two-factor login on, signing in needs your password and a six-digit code from an app on your phone. Someone who learns your password still cannot get in. Turn it on if your panel can be reached from the internet.
+
+1. Install an authenticator app, such as Google Authenticator, Microsoft Authenticator or 2FAS.
+2. On **Your account**, press **Set it up** and scan the QR code with the app.
+3. Type the code the app shows and press **Switch on**.
+4. Save the eight backup codes somewhere safe. Each one signs you in once if you lose your phone.
+
+## Locked out?
+
+- **Lost your phone:** sign in with your password and one of your backup codes.
+- **Someone else is locked out:** the admin opens **Accounts**, presses **Locked out?** next to their name, and sets a new password, switches off their two-factor login, or both. They are signed out everywhere.
+- **The admin is locked out:** reset the password on the computer itself; see [Troubleshooting](/docs/troubleshooting).
+
+Eight wrong passwords or codes from one address lock that address out for 15 minutes.
 
 === background | Running Consolry | Running in the background | Keep your servers up after you close the window or restart.
 
@@ -541,6 +663,24 @@ This takes about a minute, and players are disconnected while it happens. The pa
 - Updating from 0.1.0 or 0.2.0 has to be done by hand one last time: download the newest version from the [download page](https://www.consolry.com/download) and replace the old file, or run the install command again on Linux.
 - If the new version does not come back, start Consolry again yourself. The previous program is kept next to the new one as a file ending in `.old` until the new one has started.
 
+=== licence | Running Consolry | Licence and paid plans | What a licence key is, how to add one, and how to manage a subscription.
+
+Consolry is free to run, with no limit on servers. Paid plans add extra features on top. You always host Consolry yourself; a plan never rents you a server.
+
+> Paid plans are not on sale yet, because their features are still being built. This page explains how it will work.
+
+## Adding a licence key
+
+After paying on the [pricing page](https://www.consolry.com/pricing), you are shown a licence key starting with `CONSOLRY-`. In your panel, open **Licence** in the menu (admin only), paste it and press **Save**.
+
+The key carries the plan and the date it is paid until. Consolry checks it with a signature built into the program, so it works without contacting anyone. Once a day the panel asks consolry.com for a fresh key, which extends the date while the subscription is paid.
+
+## Managing your subscription
+
+Go to [consolry.com/license](https://www.consolry.com/license), paste your licence key under **Manage your subscription**, and press **Open billing**. Stripe's page lets you change your card, download invoices or cancel.
+
+If a subscription ends, the panel keeps working on the free plan a week after the last paid period. Your servers and data are not touched.
+
 === second-machine | Running Consolry | A second machine | Run servers on another computer from the same panel.
 
 One panel can manage servers on more than one computer. Each extra computer runs a small program, the daemon, and appears in the panel as a **node**.
@@ -584,8 +724,15 @@ Refresh the page with Ctrl+F5. If it still stops, note whether the light at the 
 
 ## I forgot my password
 
-There is no reset yet. This is a known gap in the pre-release.
+If you are not the admin, ask the admin: on **Accounts** they press **Locked out?** next to your name and set a new password.
+
+If you are the admin, reset it on the computer Consolry runs on. This also switches off two-factor login for the account.
+
+- **Windows:** open PowerShell in the folder with `Consolry.exe` (usually `%LOCALAPPDATA%\Consolry`) and run `.\Consolry.exe -reset-password yourname`
+- **Linux:** run `consolry -reset-password yourname`
+
+It prints a new password. Sign in with it, then change it on **Your account**.
 
 ## Reporting a problem
 
-Open an issue on [GitHub](https://github.com/DinoNaedYT/Consolry/issues). Include what you did, what happened, and the last lines of `consolry.log` from the [data folder](/docs/data).
+Open an issue on [GitHub](https://github.com/Consolry/Consolry/issues). Include what you did, what happened, and the last lines of `consolry.log` from the [data folder](/docs/data).

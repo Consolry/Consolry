@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DinoNaedYT/Consolry/internal/daemon"
+	"github.com/Consolry/Consolry/internal/daemon"
 )
 
 func TestSharedServerPermissions(t *testing.T) {

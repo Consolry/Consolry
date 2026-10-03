@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DinoNaedYT/Consolry/internal/minecraft"
+	"github.com/Consolry/Consolry/internal/minecraft"
 )
 
 // Events a server's alerts can be sent for.

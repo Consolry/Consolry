@@ -41,7 +41,7 @@
       "destination": "/docs"
     },
     {
-      "source": "/((?!assets/|docs/|docs$|favicon\\.svg|install\\.sh|robots\\.txt|sitemap\\.xml).+)",
+      "source": "/((?!api/|assets/|docs/|docs$|favicon\\.svg|install\\.sh|robots\\.txt|sitemap\\.xml).+)",
       "has": [
         {
           "type": "host",

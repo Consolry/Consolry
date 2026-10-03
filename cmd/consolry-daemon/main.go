@@ -13,8 +13,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/DinoNaedYT/Consolry/internal/daemon"
-	"github.com/DinoNaedYT/Consolry/internal/version"
+	"github.com/Consolry/Consolry/internal/daemon"
+	"github.com/Consolry/Consolry/internal/version"
 )
 
 func main() {

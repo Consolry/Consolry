@@ -47,7 +47,7 @@ jobs:
           CGO_ENABLED: "0"
         run: |
           version="${GITHUB_REF_NAME#v}"
-          flags="-s -w -X github.com/DinoNaedYT/Consolry/internal/version.Version=${version}"
+          flags="-s -w -X github.com/Consolry/Consolry/internal/version.Version=${version}"
           mkdir dist
           build() { # os arch extension
             GOOS=$1 GOARCH=$2 go build -trimpath -ldflags "$flags" -o "dist/consolry-$1-$2$3" ./cmd/consolry

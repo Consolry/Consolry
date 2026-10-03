@@ -2525,3 +2525,67 @@ details p {
     text-align: left;
   }
 }
+
+/* Buying a plan */
+
+.plan-buy {
+  display: grid;
+  gap: var(--s2);
+  margin-top: var(--s3);
+}
+
+.plan-buy label {
+  display: grid;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.plan-buy input {
+  padding: 8px 10px;
+  border: 2px solid var(--ink);
+  font: inherit;
+}
+
+.plan-soon {
+  margin-top: var(--s3);
+  font-family: var(--pixel-font);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Licence page */
+
+.licence {
+  display: grid;
+  gap: var(--s3);
+  max-width: 720px;
+}
+
+.licence textarea {
+  width: 100%;
+  padding: var(--s2);
+  border: 2px solid var(--ink);
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+  resize: vertical;
+}
+
+.licence ol {
+  padding-left: 1.4em;
+  list-style: decimal;
+}
+
+.licence-manage {
+  display: grid;
+  gap: var(--s2);
+  margin-top: var(--s4);
+  padding: var(--s3);
+  background: var(--white);
+  box-shadow: var(--pixel-box);
+}
+
+.licence-manage h2 {
+  font-size: 2rem;
+}

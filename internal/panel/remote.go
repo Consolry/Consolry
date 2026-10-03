@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DinoNaedYT/Consolry/internal/daemon"
+	"github.com/Consolry/Consolry/internal/daemon"
 )
 
 // Where the panel can be opened from. It always answers on the machine it runs on.

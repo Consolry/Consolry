@@ -11,8 +11,8 @@ import (
 	"github.com/johannesboyne/gofakes3"
 	"github.com/johannesboyne/gofakes3/backend/s3mem"
 
-	"github.com/DinoNaedYT/Consolry/internal/daemon"
-	"github.com/DinoNaedYT/Consolry/internal/testhelper"
+	"github.com/Consolry/Consolry/internal/daemon"
+	"github.com/Consolry/Consolry/internal/testhelper"
 )
 
 // A backup is copied to S3-compatible storage, listed, and restored from there.

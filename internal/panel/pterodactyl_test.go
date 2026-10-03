@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/DinoNaedYT/Consolry/internal/daemon"
+	"github.com/Consolry/Consolry/internal/daemon"
 )
 
 // fakePterodactyl answers the few client API calls the importer makes, for one Paper server.

@@ -2,5 +2,5 @@
 package version
 
 // Version is replaced with the release tag when a release is built
-// (-ldflags "-X github.com/DinoNaedYT/Consolry/internal/version.Version=1.2.3").
+// (-ldflags "-X github.com/Consolry/Consolry/internal/version.Version=1.2.3").
 var Version = "dev"

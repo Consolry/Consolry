@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/DinoNaedYT/Consolry/internal/minecraft"
+	"github.com/Consolry/Consolry/internal/minecraft"
 )
 
 // Plugins installed from Hangar or CurseForge are remembered by their fingerprint, because

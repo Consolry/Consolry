@@ -19,7 +19,7 @@ import (
 )
 
 // releasesURL lists Consolry's published versions, newest first, pre-releases included.
-var releasesURL = "https://api.github.com/repos/DinoNaedYT/Consolry/releases?per_page=1"
+var releasesURL = "https://api.github.com/repos/Consolry/Consolry/releases?per_page=1"
 
 // UpdateStatus is what the panel knows about a newer version of itself.
 type UpdateStatus struct {

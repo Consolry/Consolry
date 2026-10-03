@@ -2,13 +2,15 @@ import { docs } from "./docs";
 
 export const site = {
   // The pre-release the download page links to. Change it when a new version is published.
-  version: "0.3.0",
+  version: "0.4.0",
   url: "https://www.consolry.com",
   name: "Consolry",
   // The EmailOctopus form ID: the long code in the form's embed snippet.
   // Empty means the waitlist is closed.
   emailOctopusFormId: "cd69d844-be68-11f1-b6f7-f98c6be510fe",
-  github: "https://github.com/DinoNaedYT/Consolry",
+  github: "https://github.com/Consolry/Consolry",
+  // Paid plans can be bought once this is true. Keep it false until their features exist.
+  paymentsOpen: false,
   maintainer: { name: "DinoNaedYT", url: "https://github.com/DinoNaedYT" },
 };
 
@@ -53,6 +55,12 @@ const siteRoutes: Route[] = [
     nav: "Download",
     title: "Download | Consolry",
     description: "Download the Consolry pre-release: an .exe for Windows, or one command to install on Linux. Not finished yet.",
+  },
+  {
+    path: "/license",
+    nav: "",
+    title: "Your licence | Consolry",
+    description: "Get your Consolry licence key after buying a plan, or manage your subscription.",
   },
   {
     path: "/pricing",

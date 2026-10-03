@@ -1,4 +1,4 @@
-module github.com/DinoNaedYT/Consolry
+module github.com/Consolry/Consolry
 
 go 1.27.0
 

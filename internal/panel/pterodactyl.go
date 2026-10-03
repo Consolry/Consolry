@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DinoNaedYT/Consolry/internal/minecraft"
+	"github.com/Consolry/Consolry/internal/minecraft"
 )
 
 // A one-time importer from Pterodactyl. It uses Pterodactyl's client API, the same one its

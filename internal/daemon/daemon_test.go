@@ -6,7 +6,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/DinoNaedYT/Consolry/internal/testhelper"
+	"github.com/Consolry/Consolry/internal/testhelper"
 )
 
 func TestCleanLineIsAlwaysValidText(t *testing.T) {

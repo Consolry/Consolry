@@ -9,7 +9,7 @@
 # fingerprint, and puts one program called "consolry" on your PATH. Nothing else is changed.
 set -eu
 
-repo="DinoNaedYT/Consolry"
+repo="Consolry/Consolry"
 
 if [ "$(uname -s)" != "Linux" ]; then
   echo "This installer is for Linux. On Windows, download Consolry.exe from https://www.consolry.com/download" >&2

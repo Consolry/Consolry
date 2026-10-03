@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DinoNaedYT/Consolry/internal/daemon"
-	"github.com/DinoNaedYT/Consolry/internal/testhelper"
+	"github.com/Consolry/Consolry/internal/daemon"
+	"github.com/Consolry/Consolry/internal/testhelper"
 )
 
 func TestCheckAlerts(t *testing.T) {

@@ -22,7 +22,7 @@ import (
 
 const (
 	maxUpload = 4 << 30 // 4 GB
-	userAgent = "Consolry (github.com/DinoNaedYT/Consolry)"
+	userAgent = "Consolry (github.com/Consolry/Consolry)"
 )
 
 var fetchClient = &http.Client{Timeout: 15 * time.Minute}

@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const userAgent = "Consolry (github.com/DinoNaedYT/Consolry)"
+const userAgent = "Consolry (github.com/Consolry/Consolry)"
 
 var client = &http.Client{Timeout: 20 * time.Second}
 

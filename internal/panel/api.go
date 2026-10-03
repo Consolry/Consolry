@@ -18,7 +18,7 @@ import (
 
 	"github.com/coder/websocket"
 
-	"github.com/DinoNaedYT/Consolry/internal/minecraft"
+	"github.com/Consolry/Consolry/internal/minecraft"
 )
 
 //go:embed all:web/dist

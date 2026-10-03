@@ -22,9 +22,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/DinoNaedYT/Consolry/internal/daemon"
-	"github.com/DinoNaedYT/Consolry/internal/panel"
-	"github.com/DinoNaedYT/Consolry/internal/version"
+	"github.com/Consolry/Consolry/internal/daemon"
+	"github.com/Consolry/Consolry/internal/panel"
+	"github.com/Consolry/Consolry/internal/version"
 )
 
 func main() {

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DinoNaedYT/Consolry/internal/minecraft"
+	"github.com/Consolry/Consolry/internal/minecraft"
 )
 
 func queryEscape(value string) string            { return url.QueryEscape(value) }

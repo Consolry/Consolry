@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Layout from "./components/Layout";
 import { routes, site } from "./content";
 import DocsPage from "./pages/Docs";
+import LicensePage from "./pages/License";
 import Features from "./pages/Features";
 import Home from "./pages/Home";
 import { DownloadPage, FaqPage, NotFound, PricingPage, RoadmapPage } from "./pages/Other";
@@ -27,6 +28,7 @@ const pages: Record<string, () => React.JSX.Element> = {
   "/features": Features,
   "/download": DownloadPage,
   "/pricing": PricingPage,
+  "/license": LicensePage,
   "/roadmap": RoadmapPage,
   "/faq": FaqPage,
 };
