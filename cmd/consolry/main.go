@@ -34,7 +34,12 @@ func main() {
 	noLocal := flag.Bool("no-local-daemon", false, "do not run servers on this machine; use only nodes added by hand")
 	noBrowser := flag.Bool("no-browser", false, "do not open the panel in a browser on start")
 	autostart := flag.String("autostart", "", `"on" or "off": start Consolry automatically when you sign in, then exit`)
+	resetPassword := flag.String("reset-password", "", "give this account a new password and switch off its two-factor login, then exit")
 	flag.Parse()
+	if *resetPassword != "" || *autostart != "" {
+		useParentConsole()
+		log.SetOutput(os.Stderr)
+	}
 
 	home, err := dataFolder(*dir)
 	if err != nil {
@@ -46,6 +51,20 @@ func main() {
 			fatal("could not change the start-up setting: %v", err)
 		}
 		fmt.Println("Start when you sign in:", *autostart)
+		return
+	}
+
+	if *resetPassword != "" {
+		store, err := panel.OpenStore(filepath.Join(home, "consolry.db"))
+		if err != nil {
+			fatal("could not open database: %v", err)
+		}
+		password, err := store.ResetAccount(*resetPassword)
+		store.Close()
+		if err != nil {
+			fatal("%v", err)
+		}
+		fmt.Printf("New password for %s: %s\nSign in with it, then change it on Your account.\n", *resetPassword, password)
 		return
 	}
 
@@ -96,6 +115,7 @@ func main() {
 	})
 	app.StartScheduler(ctx)
 	app.StartWatching(ctx)
+	app.StartLicenceRenewal(ctx)
 	handler := app.Handler()
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	if host, port, err := net.SplitHostPort(*listen); err == nil {

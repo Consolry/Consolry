@@ -199,7 +199,8 @@ button.small {
 /* Forms */
 
 input,
-select {
+select,
+form textarea {
   display: block;
   width: 100%;
   margin-top: 6px;
@@ -212,13 +213,15 @@ select {
   font-size: 1rem;
 }
 
-input.mono {
+input.mono,
+textarea.mono {
   font-family: var(--mono);
   font-size: 0.9rem;
 }
 
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+form textarea:focus-visible {
   outline-offset: 4px;
 }
 
@@ -1922,4 +1925,13 @@ a.who:hover {
 
 .recovery code {
   font-size: 1.05rem;
+}
+
+section.card.form > button {
+  justify-self: start;
+}
+
+.lead a,
+.card .dim a {
+  color: var(--accent);
 }

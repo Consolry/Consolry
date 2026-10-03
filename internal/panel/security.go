@@ -335,3 +335,25 @@ func (a *App) handleResetAccount(w http.ResponseWriter, r *http.Request) {
 	_ = a.store.EndSessions(id, "")
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// ResetAccount gives an account a new random password, switches off its two-factor login
+// and signs it out everywhere. It is for the command line, so only someone at the
+// machine itself can use it, such as an admin who forgot their own password.
+func (s *Store) ResetAccount(username string) (string, error) {
+	user, err := s.UserByName(username)
+	if err != nil {
+		return "", fmt.Errorf("there is no account called %q", username)
+	}
+	codes, _, err := newRecoveryCodes()
+	if err != nil {
+		return "", err
+	}
+	password := strings.Join(codes[:2], "-")
+	if err := s.SetPassword(user.ID, password); err != nil {
+		return "", err
+	}
+	if err := s.setTwoFactor(user.ID, "", nil); err != nil {
+		return "", err
+	}
+	return password, s.EndSessions(user.ID, "")
+}

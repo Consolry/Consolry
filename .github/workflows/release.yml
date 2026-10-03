@@ -1,5 +1,13 @@
 # Builds Consolry for Windows and Linux and attaches the files to a GitHub release.
 # Runs when a version tag such as v0.1.0 is pushed.
+#
+# The Windows files are code-signed with Azure Trusted Signing when these repository
+# secrets exist (Settings, Secrets and variables, Actions). Without them, the release is
+# made unsigned, exactly as before.
+#   AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+#   AZURE_SIGNING_ENDPOINT   for example https://eus.codesigning.azure.net/
+#   AZURE_SIGNING_ACCOUNT    the Trusted Signing account name
+#   AZURE_SIGNING_PROFILE    the certificate profile name
 name: Release
 
 on:
@@ -10,7 +18,7 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,12 +59,68 @@ jobs:
           # The file Windows users download: built as a desktop program, so it runs from a
           # tray icon with no console window.
           GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "$flags -H=windowsgui" -o dist/Consolry.exe ./cmd/consolry
-          (cd dist && sha256sum * > checksums.txt)
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+  # Signing has to happen on Windows, after the build and before the fingerprints are taken.
+  sign:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Check whether signing is set up
+        id: check
+        shell: bash
+        env:
+          ACCOUNT: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+        run: |
+          if [ -n "$ACCOUNT" ]; then echo "enabled=true" >> "$GITHUB_OUTPUT"; else echo "Signing is not set up; the release will be unsigned."; fi
+
+      - name: Sign the Windows files
+        if: steps.check.outputs.enabled == 'true'
+        uses: azure/trusted-signing-action@v0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_SIGNING_PROFILE }}
+          files-folder: ${{ github.workspace }}\dist
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: signed
+          path: dist
+
+  publish:
+    needs: sign
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: signed
+          path: dist
 
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Fingerprints are taken last, so they match the signed files people download.
+          (cd dist && sha256sum * > checksums.txt)
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "Consolry ${GITHUB_REF_NAME#v}" \
             --generate-notes \

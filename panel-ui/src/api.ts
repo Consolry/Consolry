@@ -19,6 +19,7 @@ export type Offsite = {
 };
 export type StorageSettings = { endpoint: string; region: string; bucket: string; accessKey: string; secret?: string; folder: string; keep: number };
 export type PteroServer = { identifier: string; name: string; memoryMb: number; egg: string; software: string };
+export type LicenceInfo = { plan: string; hasKey: boolean; expires?: number; nodes?: number; licensedPlan?: string };
 export type UpdateStatus = { current: string; latest: string; available: boolean; notes: string; problem: string };
 export type PanelState = { setupNeeded: boolean; version: string; user: User | null; signupAllowed: boolean };
 export type Permission = "console" | "power" | "files" | "plugins" | "players" | "settings" | "backups" | "schedules" | "network" | "activity";
@@ -193,6 +194,9 @@ export const api = {
   pteroServers: (url: string, key: string) => request<PteroServer[]>("POST", "/import/pterodactyl/servers", { url, key }),
   pteroImport: (url: string, key: string, identifier: string, nodeId: number) =>
     request<{ id: string; files: number; notes: string[] }>("POST", "/import/pterodactyl", { url, key, identifier, nodeId }),
+
+  licence: () => request<LicenceInfo>("GET", "/licence"),
+  setLicence: (key: string) => request<LicenceInfo>("POST", "/licence", { key }),
 
   update: () => request<UpdateStatus>("GET", "/update"),
   installUpdate: () => request<void>("POST", "/update", {}),

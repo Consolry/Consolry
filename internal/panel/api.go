@@ -100,6 +100,8 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("POST /api/storage", a.admin(a.handleUpdateStorage))
 	mux.Handle("POST /api/import/pterodactyl/servers", a.admin(a.handlePteroServers))
 	mux.Handle("POST /api/import/pterodactyl", a.admin(a.handlePteroImport))
+	mux.Handle("GET /api/licence", a.admin(a.handleLicence))
+	mux.Handle("POST /api/licence", a.admin(a.handleUpdateLicence))
 	mux.Handle("GET /api/update", a.admin(a.handleUpdateStatus))
 	mux.Handle("POST /api/update", a.admin(a.handleInstallUpdate))
 	mux.Handle("GET /api/accounts", a.admin(a.handleAccounts))
