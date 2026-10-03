@@ -10,6 +10,14 @@ export type LoginResult = User | { twoFactor: true; ticket: string };
 export type Account = User & { servers: number };
 export type AlertSettings = { discord: string; email: string; events: string[] };
 export type SmtpSettings = { host: string; port: number; username: string; password?: string; from: string };
+export type Offsite = {
+  available: boolean;
+  enabled: boolean;
+  keep: number;
+  copies: { name: string; size: number; created: number }[];
+  problem?: string;
+};
+export type StorageSettings = { endpoint: string; region: string; bucket: string; accessKey: string; secret?: string; folder: string; keep: number };
 export type UpdateStatus = { current: string; latest: string; available: boolean; notes: string; problem: string };
 export type PanelState = { setupNeeded: boolean; version: string; user: User | null; signupAllowed: boolean };
 export type Permission = "console" | "power" | "files" | "plugins" | "players" | "settings" | "backups" | "schedules" | "network" | "activity";
@@ -173,6 +181,13 @@ export const api = {
   panelAlerts: () => request<{ alerts: AlertSettings; smtp: SmtpSettings; smtpPasswordSet: boolean }>("GET", "/alerts"),
   setPanelAlerts: (alerts: AlertSettings, test: boolean) => request<AlertSettings>("POST", "/alerts", { ...alerts, test }),
   setSmtp: (smtp: SmtpSettings) => request<void>("POST", "/alerts/smtp", smtp),
+
+  offsite: (id: string) => request<Offsite>("GET", `/servers/${id}/offsite`),
+  setOffsite: (id: string, change: { enabled?: boolean; copyNow?: string }) => request<Offsite>("POST", `/servers/${id}/offsite`, change),
+  offsiteUrl: (id: string, name: string) => `/api/servers/${id}/offsite/${name}`,
+  restoreOffsite: (id: string, name: string) => request<void>("POST", `/servers/${id}/offsite/${name}/restore`, {}),
+  storage: () => request<{ storage: StorageSettings; secretSet: boolean }>("GET", "/storage"),
+  setStorage: (storage: StorageSettings) => request<{ storage: StorageSettings; secretSet: boolean }>("POST", "/storage", storage),
 
   update: () => request<UpdateStatus>("GET", "/update"),
   installUpdate: () => request<void>("POST", "/update", {}),

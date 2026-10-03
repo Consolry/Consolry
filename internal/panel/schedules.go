@@ -225,7 +225,13 @@ func (a *App) runSchedule(ctx context.Context, schedule Schedule) string {
 	case "restart":
 		err = restart(ctx, node, row.ID)
 	case "backup":
-		err = node.slow(ctx, http.MethodPost, fmt.Sprintf("/servers/%s/backups?kind=scheduled&keep=%d", row.ID, scheduledBackupsKept), nil, nil)
+		var info struct {
+			Name string `json:"name"`
+		}
+		err = node.slow(ctx, http.MethodPost, fmt.Sprintf("/servers/%s/backups?kind=scheduled&keep=%d", row.ID, scheduledBackupsKept), nil, &info)
+		if err == nil {
+			a.copyOffsiteLater(node, row, info.Name)
+		}
 	case "command":
 		err = node.call(ctx, http.MethodPost, "/servers/"+row.ID+"/command", map[string]string{"command": schedule.Command}, nil)
 	}

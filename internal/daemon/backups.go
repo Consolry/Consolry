@@ -300,6 +300,47 @@ func registerBackups(mux *http.ServeMux, m *Manager) {
 		http.ServeFile(w, r, filepath.Join(m.backupDir(s.spec.ID), name))
 	})
 
+	// Putting a backup back, such as one brought home from off-site storage, so it can be restored.
+	mux.HandleFunc("PUT /servers/{id}/backups/{name}", func(w http.ResponseWriter, r *http.Request) {
+		s, name, ok := named(w, r)
+		if !ok {
+			return
+		}
+		dir := m.backupDir(s.spec.ID)
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			writeError(w, http.StatusInternalServerError, tidyError(err))
+			return
+		}
+		tmp := filepath.Join(dir, name+".part")
+		out, err := os.Create(tmp)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, tidyError(err))
+			return
+		}
+		_, err = io.Copy(out, r.Body)
+		if closeErr := out.Close(); err == nil {
+			err = closeErr
+		}
+		if err == nil {
+			// Only a complete zip is kept.
+			var archive *zip.ReadCloser
+			if archive, err = zip.OpenReader(tmp); err == nil {
+				archive.Close()
+			}
+		}
+		if err != nil {
+			_ = os.Remove(tmp)
+			writeError(w, http.StatusBadRequest, "that is not a complete backup")
+			return
+		}
+		if err := os.Rename(tmp, filepath.Join(dir, name)); err != nil {
+			_ = os.Remove(tmp)
+			writeError(w, http.StatusInternalServerError, tidyError(err))
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	mux.HandleFunc("DELETE /servers/{id}/backups/{name}", func(w http.ResponseWriter, r *http.Request) {
 		s, name, ok := named(w, r)
 		if !ok {

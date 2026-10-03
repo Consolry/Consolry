@@ -3,6 +3,7 @@ package panel
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
@@ -75,6 +76,16 @@ func (a *App) handleNodeProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer res.Body.Close()
+	// A backup made by hand is copied off-site too, if the server asks for that.
+	if r.Method == http.MethodPost && rest == "backups" && res.StatusCode < 300 {
+		data, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
+		var info struct {
+			Name string `json:"name"`
+		}
+		_ = json.Unmarshal(data, &info)
+		a.copyOffsiteLater(node, row, info.Name)
+		res.Body = io.NopCloser(bytes.NewReader(data))
+	}
 	for _, header := range []string{"Content-Type", "Content-Disposition", "Content-Length", "Last-Modified"} {
 		if value := res.Header.Get(header); value != "" {
 			w.Header().Set(header, value)

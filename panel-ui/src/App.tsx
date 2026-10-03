@@ -10,6 +10,7 @@ import Access from "./Access";
 import Account from "./Account";
 import Accounts from "./Accounts";
 import PanelAlerts from "./Alerts";
+import StoragePage from "./Offsite";
 import {
   api,
   isLive,
@@ -34,7 +35,8 @@ type View =
   | { kind: "access" }
   | { kind: "accounts" }
   | { kind: "account" }
-  | { kind: "alerts" };
+  | { kind: "alerts" }
+  | { kind: "storage" };
 
 // The address after # decides the page, so a refresh or a shared link lands in the same place.
 function parseHash(hash: string): View {
@@ -51,6 +53,7 @@ function parseHash(hash: string): View {
   if (parts[0] === "accounts") return { kind: "accounts" };
   if (parts[0] === "account") return { kind: "account" };
   if (parts[0] === "alerts") return { kind: "alerts" };
+  if (parts[0] === "storage") return { kind: "storage" };
   return { kind: "overview" };
 }
 
@@ -63,6 +66,15 @@ function useView() {
   }, []);
   return view;
 }
+
+/** The pages only the admin sees, in the order they appear in the menu. */
+const adminPages = [
+  { kind: "nodes", label: "Nodes" },
+  { kind: "accounts", label: "Accounts" },
+  { kind: "storage", label: "Storage" },
+  { kind: "alerts", label: "Alerts" },
+  { kind: "access", label: "Remote access" },
+] as const;
 
 function useNow() {
   const [now, setNow] = useState(Date.now());
@@ -383,6 +395,7 @@ function Panel({
     accounts: "Accounts",
     account: "Your account",
     alerts: "Alerts",
+    storage: "Storage",
   };
   const crumb =
     view.kind === "server"
@@ -414,38 +427,19 @@ function Panel({
           <a href="#/" className={view.kind === "overview" ? "on" : undefined}>
             Overview
           </a>
-          {admin && (
-            <a
-              href="#/nodes"
-              className={view.kind === "nodes" ? "on" : undefined}
-            >
-              Nodes <span className="count">{nodes.length}</span>
-            </a>
-          )}
-          {admin && (
-            <a
-              href="#/accounts"
-              className={view.kind === "accounts" ? "on" : undefined}
-            >
-              Accounts
-            </a>
-          )}
-          {admin && (
-            <a
-              href="#/alerts"
-              className={view.kind === "alerts" ? "on" : undefined}
-            >
-              Alerts
-            </a>
-          )}
-          {admin && (
-            <a
-              href="#/access"
-              className={view.kind === "access" ? "on" : undefined}
-            >
-              Remote access
-            </a>
-          )}
+          {admin &&
+            adminPages.map((page) => (
+              <a
+                key={page.kind}
+                href={`#/${page.kind}`}
+                className={view.kind === page.kind ? "on" : undefined}
+              >
+                {page.label}
+                {page.kind === "nodes" && (
+                  <span className="count">{nodes.length}</span>
+                )}
+              </a>
+            ))}
         </nav>
         <p className="pixel heading">Servers</p>
         <nav aria-label="Servers">
@@ -552,6 +546,7 @@ function Panel({
         {view.kind === "access" && admin && <Access />}
         {view.kind === "accounts" && admin && <Accounts />}
         {view.kind === "alerts" && admin && <PanelAlerts />}
+        {view.kind === "storage" && admin && <StoragePage />}
         {view.kind === "account" && (
           <Account user={user} onChanged={onAccountChanged} />
         )}
