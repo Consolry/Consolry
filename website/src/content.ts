@@ -2,7 +2,7 @@ import { docs } from "./docs";
 
 export const site = {
   // The pre-release the download page links to. Change it when a new version is published.
-  version: "0.4.0",
+  version: "0.3.0",
   url: "https://www.consolry.com",
   name: "Consolry",
   // The EmailOctopus form ID: the long code in the form's embed snippet.
