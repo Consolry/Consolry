@@ -98,6 +98,8 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("POST /api/servers/{id}/offsite/{name}/restore", a.onServer("backups", a.handleOffsiteRestore))
 	mux.Handle("GET /api/storage", a.admin(a.handleStorage))
 	mux.Handle("POST /api/storage", a.admin(a.handleUpdateStorage))
+	mux.Handle("POST /api/import/pterodactyl/servers", a.admin(a.handlePteroServers))
+	mux.Handle("POST /api/import/pterodactyl", a.admin(a.handlePteroImport))
 	mux.Handle("GET /api/update", a.admin(a.handleUpdateStatus))
 	mux.Handle("POST /api/update", a.admin(a.handleInstallUpdate))
 	mux.Handle("GET /api/accounts", a.admin(a.handleAccounts))

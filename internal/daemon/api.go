@@ -154,6 +154,7 @@ func Handler(m *Manager, token, version string) http.Handler {
 	registerJava(mux, m)
 	registerNetwork(mux)
 	registerForwarding(mux)
+	registerImport(mux, m)
 
 	return requireToken(token, mux)
 }

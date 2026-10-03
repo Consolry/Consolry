@@ -11,6 +11,7 @@ import Account from "./Account";
 import Accounts from "./Accounts";
 import PanelAlerts from "./Alerts";
 import StoragePage from "./Offsite";
+import Import from "./Import";
 import {
   api,
   isLive,
@@ -36,7 +37,8 @@ type View =
   | { kind: "accounts" }
   | { kind: "account" }
   | { kind: "alerts" }
-  | { kind: "storage" };
+  | { kind: "storage" }
+  | { kind: "import" };
 
 // The address after # decides the page, so a refresh or a shared link lands in the same place.
 function parseHash(hash: string): View {
@@ -54,6 +56,7 @@ function parseHash(hash: string): View {
   if (parts[0] === "account") return { kind: "account" };
   if (parts[0] === "alerts") return { kind: "alerts" };
   if (parts[0] === "storage") return { kind: "storage" };
+  if (parts[0] === "import") return { kind: "import" };
   return { kind: "overview" };
 }
 
@@ -396,6 +399,7 @@ function Panel({
     account: "Your account",
     alerts: "Alerts",
     storage: "Storage",
+    import: "Import from Pterodactyl",
   };
   const crumb =
     view.kind === "server"
@@ -547,6 +551,9 @@ function Panel({
         {view.kind === "accounts" && admin && <Accounts />}
         {view.kind === "alerts" && admin && <PanelAlerts />}
         {view.kind === "storage" && admin && <StoragePage />}
+        {view.kind === "import" && admin && (
+          <Import nodes={nodes} onImported={() => loadServers()} />
+        )}
         {view.kind === "account" && (
           <Account user={user} onChanged={onAccountChanged} />
         )}
