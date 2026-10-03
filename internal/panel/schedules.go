@@ -260,6 +260,11 @@ func (a *App) StartScheduler(ctx context.Context) {
 						result := a.runSchedule(ctx, schedule)
 						a.store.markScheduleRun(schedule.ID, now, result)
 						a.store.Log(schedule.ServerID, "schedule", "Scheduled "+schedule.Action+": "+result)
+						if strings.HasPrefix(result, "Failed") {
+							if row, err := a.store.Server(schedule.ServerID); err == nil {
+								a.notify(row.ID, "task", "A scheduled "+schedule.Action+" on "+row.Name+" failed", result)
+							}
+						}
 					}(schedule)
 				}
 			}

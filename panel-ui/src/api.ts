@@ -8,6 +8,8 @@ export type User = { id: number; username: string; admin: boolean; twoFactor: bo
 /** A sign-in answer: either the account, or a request for the code from an authenticator app. */
 export type LoginResult = User | { twoFactor: true; ticket: string };
 export type Account = User & { servers: number };
+export type AlertSettings = { discord: string; email: string; events: string[] };
+export type SmtpSettings = { host: string; port: number; username: string; password?: string; from: string };
 export type UpdateStatus = { current: string; latest: string; available: boolean; notes: string; problem: string };
 export type PanelState = { setupNeeded: boolean; version: string; user: User | null; signupAllowed: boolean };
 export type Permission = "console" | "power" | "files" | "plugins" | "players" | "settings" | "backups" | "schedules" | "network" | "activity";
@@ -162,6 +164,12 @@ export const api = {
 
   panelSettings: () => request<PanelSettings>("GET", "/panel"),
   updatePanelSettings: (patch: { signup?: boolean; remote?: RemoteMode }) => request<PanelSettings>("POST", "/panel", patch),
+
+  serverAlerts: (id: string) => request<AlertSettings>("GET", `/servers/${id}/alerts`),
+  setServerAlerts: (id: string, alerts: AlertSettings, test: boolean) => request<AlertSettings>("POST", `/servers/${id}/alerts`, { ...alerts, test }),
+  panelAlerts: () => request<{ alerts: AlertSettings; smtp: SmtpSettings; smtpPasswordSet: boolean }>("GET", "/alerts"),
+  setPanelAlerts: (alerts: AlertSettings, test: boolean) => request<AlertSettings>("POST", "/alerts", { ...alerts, test }),
+  setSmtp: (smtp: SmtpSettings) => request<void>("POST", "/alerts/smtp", smtp),
 
   update: () => request<UpdateStatus>("GET", "/update"),
   installUpdate: () => request<void>("POST", "/update", {}),

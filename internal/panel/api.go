@@ -35,6 +35,7 @@ type App struct {
 	version string
 	remote  remoteAccess
 	updates updater
+	watch   *watcher
 }
 
 func New(store *Store, version string) *App { return &App{store: store, version: version} }
@@ -85,6 +86,11 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("DELETE /api/servers/{id}/users/{uid}", a.onServer(ownerOnly, a.handleRemoveMember))
 
 	mux.Handle("GET /api/panel", a.admin(a.handlePanelSettings))
+	mux.Handle("GET /api/servers/{id}/alerts", a.onServer(ownerOnly, a.handleServerAlerts))
+	mux.Handle("POST /api/servers/{id}/alerts", a.onServer(ownerOnly, a.handleUpdateServerAlerts))
+	mux.Handle("GET /api/alerts", a.admin(a.handlePanelAlerts))
+	mux.Handle("POST /api/alerts", a.admin(a.handleUpdatePanelAlerts))
+	mux.Handle("POST /api/alerts/smtp", a.admin(a.handleUpdateSMTP))
 	mux.Handle("GET /api/update", a.admin(a.handleUpdateStatus))
 	mux.Handle("POST /api/update", a.admin(a.handleInstallUpdate))
 	mux.Handle("GET /api/accounts", a.admin(a.handleAccounts))

@@ -9,6 +9,7 @@ import {
 import Access from "./Access";
 import Account from "./Account";
 import Accounts from "./Accounts";
+import PanelAlerts from "./Alerts";
 import {
   api,
   isLive,
@@ -32,7 +33,8 @@ type View =
   | { kind: "nodes" }
   | { kind: "access" }
   | { kind: "accounts" }
-  | { kind: "account" };
+  | { kind: "account" }
+  | { kind: "alerts" };
 
 // The address after # decides the page, so a refresh or a shared link lands in the same place.
 function parseHash(hash: string): View {
@@ -48,6 +50,7 @@ function parseHash(hash: string): View {
   if (parts[0] === "access") return { kind: "access" };
   if (parts[0] === "accounts") return { kind: "accounts" };
   if (parts[0] === "account") return { kind: "account" };
+  if (parts[0] === "alerts") return { kind: "alerts" };
   return { kind: "overview" };
 }
 
@@ -372,20 +375,19 @@ function Panel({
     view.kind === "server"
       ? servers.find((server) => server.id === view.id)
       : undefined;
+  const titles: Record<Exclude<View["kind"], "server">, string> = {
+    overview: "Overview",
+    "new-server": "New server",
+    nodes: "Nodes",
+    access: "Remote access",
+    accounts: "Accounts",
+    account: "Your account",
+    alerts: "Alerts",
+  };
   const crumb =
     view.kind === "server"
       ? (selected?.name ?? "Unknown server")
-      : view.kind === "new-server"
-        ? "New server"
-        : view.kind === "nodes"
-          ? "Nodes"
-          : view.kind === "access"
-            ? "Remote access"
-            : view.kind === "accounts"
-              ? "Accounts"
-              : view.kind === "account"
-                ? "Your account"
-                : "Overview";
+      : titles[view.kind];
 
   return (
     <div className="shell">
@@ -426,6 +428,14 @@ function Panel({
               className={view.kind === "accounts" ? "on" : undefined}
             >
               Accounts
+            </a>
+          )}
+          {admin && (
+            <a
+              href="#/alerts"
+              className={view.kind === "alerts" ? "on" : undefined}
+            >
+              Alerts
             </a>
           )}
           {admin && (
@@ -541,6 +551,7 @@ function Panel({
         )}
         {view.kind === "access" && admin && <Access />}
         {view.kind === "accounts" && admin && <Accounts />}
+        {view.kind === "alerts" && admin && <PanelAlerts />}
         {view.kind === "account" && (
           <Account user={user} onChanged={onAccountChanged} />
         )}

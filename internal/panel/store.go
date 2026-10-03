@@ -64,6 +64,12 @@ CREATE TABLE IF NOT EXISTS server_users (
 	permissions TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (server_id, user_id)
 );
+CREATE TABLE IF NOT EXISTS alerts (
+	server_id TEXT PRIMARY KEY,
+	discord   TEXT NOT NULL DEFAULT '',
+	email     TEXT NOT NULL DEFAULT '',
+	events    TEXT NOT NULL DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS settings (
 	key   TEXT PRIMARY KEY,
 	value TEXT NOT NULL
@@ -309,6 +315,7 @@ func (s *Store) DeleteServer(id string) error {
 	}
 	_, _ = s.db.Exec(`DELETE FROM activity WHERE server_id = ?`, id)
 	_, _ = s.db.Exec(`DELETE FROM server_users WHERE server_id = ?`, id)
+	_, _ = s.db.Exec(`DELETE FROM alerts WHERE server_id = ?`, id)
 	_, err := s.db.Exec(`DELETE FROM servers WHERE id = ?`, id)
 	return err
 }

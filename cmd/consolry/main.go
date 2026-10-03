@@ -95,6 +95,7 @@ func main() {
 		stop()
 	})
 	app.StartScheduler(ctx)
+	app.StartWatching(ctx)
 	handler := app.Handler()
 	server := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	if host, port, err := net.SplitHostPort(*listen); err == nil {
