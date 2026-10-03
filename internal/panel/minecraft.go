@@ -192,6 +192,8 @@ type pluginView struct {
 	IconURL   string `json:"iconUrl,omitempty"`
 	Version   string `json:"version,omitempty"`
 	Update    string `json:"update,omitempty"`
+	// Source is where it was installed from, for the ones Consolry recognises.
+	Source string `json:"source,omitempty"`
 }
 
 func (a *App) handlePlugins(w http.ResponseWriter, r *http.Request) {
@@ -223,13 +225,14 @@ func (a *App) handlePlugins(w http.ResponseWriter, r *http.Request) {
 		view := pluginView{File: file.Name, Size: file.Size}
 		if version, ok := known[file.SHA1]; ok {
 			view.Verified, view.ProjectID, view.Version = true, version.ProjectID, version.VersionNumber
-			view.Title, view.IconURL = titles[version.ProjectID].Title, titles[version.ProjectID].IconURL
+			view.Title, view.IconURL, view.Source = titles[version.ProjectID].Title, titles[version.ProjectID].IconURL, minecraft.SourceModrinth
 			if newer, ok := updates[file.SHA1]; ok && newer.ID != version.ID {
 				view.Update = newer.VersionNumber
 			}
 		}
 		items[i] = view
 	}
+	a.describeRecorded(r.Context(), row, software, files, items)
 	writeJSON(w, http.StatusOK, map[string]any{"folder": software.Folder, "items": items, "lookupFailed": lookupErr != nil})
 }
 
@@ -243,12 +246,38 @@ func (a *App) handlePluginSearch(w http.ResponseWriter, r *http.Request) {
 	if page < 0 || page > 500 {
 		page = 0
 	}
-	projects, total, err := minecraft.Search(r.Context(), r.URL.Query().Get("q"), software, row.MCVersion, page*pageSize, pageSize)
+	query := r.URL.Query().Get("q")
+	sources := []string{minecraft.SourceModrinth, minecraft.SourceCurseForge}
+	if minecraft.HangarSupports(software) {
+		sources = []string{minecraft.SourceModrinth, minecraft.SourceHangar, minecraft.SourceCurseForge}
+	}
+	reply := map[string]any{"pageSize": pageSize, "sources": sources, "curseforgeReady": a.curseKey() != ""}
+
+	var projects []minecraft.Project
+	var total int
+	var err error
+	switch source := r.URL.Query().Get("source"); source {
+	case minecraft.SourceHangar:
+		projects, total, err = minecraft.HangarSearch(r.Context(), query, software, row.MCVersion, page*pageSize, pageSize)
+	case minecraft.SourceCurseForge:
+		if a.curseKey() == "" {
+			reply["projects"], reply["total"] = []minecraft.Project{}, 0
+			writeJSON(w, http.StatusOK, reply)
+			return
+		}
+		projects, total, err = minecraft.CurseSearch(r.Context(), a.curseKey(), query, software, row.MCVersion, page*pageSize, pageSize)
+	default:
+		projects, total, err = minecraft.Search(r.Context(), query, software, row.MCVersion, page*pageSize, pageSize)
+	}
 	if err != nil {
-		writeError(w, http.StatusBadGateway, "could not search Modrinth: "+err.Error())
+		writeError(w, http.StatusBadGateway, "could not search: "+err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"projects": projects, "total": total, "pageSize": pageSize})
+	if projects == nil {
+		projects = []minecraft.Project{}
+	}
+	reply["projects"], reply["total"] = projects, total
+	writeJSON(w, http.StatusOK, reply)
 }
 
 // installProject installs the newest suitable version of a project, then anything it requires.
@@ -284,6 +313,9 @@ func installProject(ctx context.Context, node Node, row ServerRow, software mine
 func (a *App) handlePluginInstall(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		ProjectID string `json:"projectId"`
+		Source    string `json:"source"`
+		Title     string `json:"title"`
+		IconURL   string `json:"iconUrl"`
 	}
 	if !readJSON(w, r, &input) {
 		return
@@ -312,6 +344,15 @@ func (a *App) handlePluginInstall(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	installed := []string{}
+	if input.Source == minecraft.SourceHangar || input.Source == minecraft.SourceCurseForge {
+		if err := a.installFromSource(r.Context(), node, row, software, input.Source, input.ProjectID, input.Title, input.IconURL, map[string]bool{}, &installed); err != nil {
+			writeError(w, http.StatusBadGateway, err.Error())
+			return
+		}
+		a.log(r, row.ID, "Installed "+strings.Join(installed, ", ")+" from "+input.Source)
+		writeJSON(w, http.StatusOK, map[string]any{"installed": installed})
+		return
+	}
 	if err := installProject(r.Context(), node, row, software, input.ProjectID, have, &installed); err != nil {
 		writeError(w, http.StatusBadGateway, err.Error())
 		return
@@ -344,6 +385,21 @@ func (a *App) handlePluginUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if current.Name == "" {
 		writeError(w, http.StatusNotFound, "that file is not installed")
+		return
+	}
+	// Plugins from Hangar or CurseForge are updated from there.
+	if _, recorded := a.store.installRecords(row.ID)[strings.ToLower(current.SHA1)]; recorded {
+		filename, err := a.updateFromSource(r.Context(), node, row, software, current)
+		var refused errConflict
+		switch {
+		case errors.As(err, &refused):
+			writeError(w, http.StatusConflict, err.Error())
+		case err != nil:
+			writeError(w, http.StatusBadGateway, err.Error())
+		default:
+			a.log(r, row.ID, "Updated "+current.Name+" to "+filename)
+			writeJSON(w, http.StatusOK, map[string]string{"file": filename})
+		}
 		return
 	}
 	updates, err := minecraft.Updates(r.Context(), []string{current.SHA1}, software, row.MCVersion)

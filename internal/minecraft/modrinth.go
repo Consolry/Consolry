@@ -19,6 +19,8 @@ type Project struct {
 	Author      string `json:"author"`
 	Downloads   int    `json:"downloads"`
 	IconURL     string `json:"iconUrl"`
+	// Source is the site it comes from: modrinth, hangar or curseforge.
+	Source string `json:"source"`
 }
 
 // Version is one downloadable release of a project.
@@ -26,7 +28,9 @@ type Version struct {
 	ID            string `json:"id"`
 	ProjectID     string `json:"project_id"`
 	VersionNumber string `json:"version_number"`
-	Files         []struct {
+	// VersionType is "release", "beta" or "alpha". Only releases are offered unless there is nothing else.
+	VersionType string `json:"version_type"`
+	Files       []struct {
 		URL      string `json:"url"`
 		Filename string `json:"filename"`
 		Primary  bool   `json:"primary"`
@@ -114,7 +118,7 @@ func Search(ctx context.Context, query string, software Software, gameVersion st
 	}
 	projects = make([]Project, len(reply.Hits))
 	for i, hit := range reply.Hits {
-		projects[i] = Project{ID: hit.ProjectID, Title: hit.Title, Description: hit.Description, Author: hit.Author, Downloads: hit.Downloads, IconURL: hit.IconURL}
+		projects[i] = Project{ID: hit.ProjectID, Title: hit.Title, Description: hit.Description, Author: hit.Author, Downloads: hit.Downloads, IconURL: hit.IconURL, Source: SourceModrinth}
 	}
 	return projects, reply.Total, nil
 }
@@ -132,6 +136,11 @@ func Latest(ctx context.Context, projectID string, software Software, gameVersio
 	if len(versions) == 0 {
 		return Version{}, false, nil
 	}
+	for _, version := range versions {
+		if version.VersionType == "release" {
+			return version, true, nil
+		}
+	}
 	return versions[0], true, nil
 }
 
@@ -147,13 +156,14 @@ func Identify(ctx context.Context, sha1s []string) (map[string]Version, error) {
 	return found, err
 }
 
-// Updates returns, for each recognised file, the newest version that runs on this server.
+// Updates returns, for each recognised file, the newest full release that runs on this server.
+// Test builds are never offered as updates.
 func Updates(ctx context.Context, sha1s []string, software Software, gameVersion string) (map[string]Version, error) {
 	found := map[string]Version{}
 	if len(sha1s) == 0 {
 		return found, nil
 	}
-	request := map[string]any{"hashes": sha1s, "algorithm": "sha1", "loaders": software.Loaders}
+	request := map[string]any{"hashes": sha1s, "algorithm": "sha1", "loaders": software.Loaders, "version_types": []string{"release"}}
 	if gameVersion != "" {
 		request["game_versions"] = []string{gameVersion}
 	}

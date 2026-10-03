@@ -91,6 +91,7 @@ func (a *App) Handler() http.Handler {
 	mux.Handle("GET /api/alerts", a.admin(a.handlePanelAlerts))
 	mux.Handle("POST /api/alerts", a.admin(a.handleUpdatePanelAlerts))
 	mux.Handle("POST /api/alerts/smtp", a.admin(a.handleUpdateSMTP))
+	mux.Handle("POST /api/plugin-sources", a.admin(a.handlePluginSources))
 	mux.Handle("GET /api/update", a.admin(a.handleUpdateStatus))
 	mux.Handle("POST /api/update", a.admin(a.handleInstallUpdate))
 	mux.Handle("GET /api/accounts", a.admin(a.handleAccounts))

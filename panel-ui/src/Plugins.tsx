@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { api, formatBytes, isLive, type PluginList, type Project, type ServerInfo } from "./api";
+import { api, formatBytes, isLive, type PluginList, type PluginSearch, type PluginSource, type Project, type ServerInfo } from "./api";
 import { Empty, ErrorNote, useAction } from "./ui";
+
+const sourceNames: Record<PluginSource, string> = { modrinth: "Modrinth", hangar: "Hangar", curseforge: "CurseForge" };
 
 function compact(count: number) {
   if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(count >= 10_000_000 ? 0 : 1)}M`;
@@ -14,7 +16,10 @@ export default function Plugins({ server }: { server: ServerInfo }) {
   const [typed, setTyped] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(0);
-  const [results, setResults] = useState<{ projects: Project[]; total: number; pageSize: number } | null>(null);
+  const [source, setSource] = useState<PluginSource>("modrinth");
+  const [results, setResults] = useState<PluginSearch | null>(null);
+  const [admin, setAdmin] = useState(false);
+  const [key, setKey] = useState("");
   const [notice, setNotice] = useState("");
   const [confirming, setConfirming] = useState("");
   const { error, busy, run, setError } = useAction();
@@ -25,19 +30,22 @@ export default function Plugins({ server }: { server: ServerInfo }) {
     api.plugins(server.id).then(setList, (problem) => setError((problem as Error).message));
   }, [server.id, setError]);
   useEffect(loadInstalled, [loadInstalled]);
+  useEffect(() => {
+    api.state().then((state) => setAdmin(Boolean(state.user?.admin)), () => {});
+  }, []);
 
   // With nothing typed this shows the most downloaded; with a search it shows the best matches.
   useEffect(() => {
     let cancelled = false;
     setResults(null);
-    api.searchPlugins(server.id, query, page).then(
+    api.searchPlugins(server.id, query, page, source).then(
       (result) => !cancelled && setResults(result),
       (problem) => !cancelled && setError((problem as Error).message),
     );
     return () => {
       cancelled = true;
     };
-  }, [server.id, query, page, setError]);
+  }, [server.id, query, page, source, setError]);
 
   function search(event: FormEvent) {
     event.preventDefault();
@@ -49,7 +57,7 @@ export default function Plugins({ server }: { server: ServerInfo }) {
   function install(project: Project) {
     setNotice("");
     run(`install ${project.projectId}`, async () => {
-      const { installed } = await api.installPlugin(server.id, project.projectId);
+      const { installed } = await api.installPlugin(server.id, project);
       const extra = installed.length - 1;
       setNotice(
         `Installed ${project.title}` +
@@ -93,11 +101,59 @@ export default function Plugins({ server }: { server: ServerInfo }) {
 
       {view === "browse" && (
         <>
+          <div className="segmented" role="tablist" aria-label="Where to search">
+            {(results?.sources ?? ["modrinth"]).map((item) => (
+              <button
+                key={item}
+                role="tab"
+                aria-selected={source === item}
+                onClick={() => {
+                  setPage(0);
+                  setSource(item);
+                }}
+              >
+                {sourceNames[item]}
+              </button>
+            ))}
+          </div>
           <p className="dim">
-            {query ? `Results for "${query}"` : `Most downloaded ${word}s`} with a version for this server, from Modrinth. Anything a {word} requires is
-            installed with it, and a backup is taken first.
+            {query ? `Results for "${query}"` : `Most downloaded ${word}s`} with a version for this server, from {sourceNames[source]}. Every download is checked
+            against the fingerprint {sourceNames[source]} publishes. Anything a {word} requires is installed with it, and a backup is taken first.
           </p>
-          {results === null ? (
+          {source === "curseforge" && results && !results.curseforgeReady ? (
+            <div className="card form wide">
+              <h2>Connect CurseForge</h2>
+              <p className="dim">
+                CurseForge only answers programs that have a key. Keys are free: sign in at{" "}
+                <a href="https://console.curseforge.com/" target="_blank" rel="noreferrer">
+                  console.curseforge.com
+                </a>
+                , open API keys, and copy yours.
+              </p>
+              {admin ? (
+                <form
+                  className="bar"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    run("key", () => api.setCurseForgeKey(key), () => {
+                      setKey("");
+                      setResults(null);
+                      setPage(0);
+                      setSource("modrinth");
+                      setTimeout(() => setSource("curseforge"));
+                    });
+                  }}
+                >
+                  <input className="mono grow" value={key} onChange={(event) => setKey(event.target.value)} placeholder="Paste your CurseForge API key" required spellCheck={false} />
+                  <button className="primary small" disabled={busy !== ""}>
+                    Save key
+                  </button>
+                </form>
+              ) : (
+                <p>Ask the panel's admin to add one.</p>
+              )}
+            </div>
+          ) : results === null ? (
             <ul className="grid" aria-busy="true">
               {Array.from({ length: 16 }, (_, index) => (
                 <li key={index} className="tile loading" />
@@ -108,7 +164,7 @@ export default function Plugins({ server }: { server: ServerInfo }) {
           ) : (
             <ul className="grid">
               {results.projects.map((project) => (
-                <li key={project.projectId} className="tile">
+                <li key={`${project.source}-${project.projectId}`} className="tile">
                   <div className="tile-head">
                     <Icon url={project.iconUrl} name={project.title} />
                     <div>
@@ -162,7 +218,7 @@ export default function Plugins({ server }: { server: ServerInfo }) {
                     <Icon url={item.iconUrl} name={item.title ?? item.file} />
                     <div>
                       <strong>{item.title ?? item.file}</strong>
-                      <small>{item.verified ? item.version : "Not from Modrinth"}</small>
+                      <small>{item.verified ? `${item.version} · ${sourceNames[item.source ?? "modrinth"]}` : "Not recognised"}</small>
                     </div>
                   </div>
                   <p className="dim file">
@@ -171,7 +227,11 @@ export default function Plugins({ server }: { server: ServerInfo }) {
                   <div className="tile-foot">
                     <span
                       className={item.verified ? "state running" : "state"}
-                      title={item.verified ? "This file matches the one published on Modrinth" : "This file can't be checked or updated here"}
+                      title={
+                        item.verified
+                          ? `This file matches the one published on ${sourceNames[item.source ?? "modrinth"]}`
+                          : "This file can't be checked or updated here"
+                      }
                     >
                       {item.verified ? "Verified" : "Unverified"}
                     </span>

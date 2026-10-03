@@ -70,6 +70,16 @@ CREATE TABLE IF NOT EXISTS alerts (
 	email     TEXT NOT NULL DEFAULT '',
 	events    TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS plugin_installs (
+	server_id TEXT NOT NULL,
+	sha1      TEXT NOT NULL,
+	source    TEXT NOT NULL,
+	project   TEXT NOT NULL,
+	version   TEXT NOT NULL DEFAULT '',
+	title     TEXT NOT NULL DEFAULT '',
+	icon      TEXT NOT NULL DEFAULT '',
+	PRIMARY KEY (server_id, sha1)
+);
 CREATE TABLE IF NOT EXISTS settings (
 	key   TEXT PRIMARY KEY,
 	value TEXT NOT NULL
@@ -316,6 +326,7 @@ func (s *Store) DeleteServer(id string) error {
 	_, _ = s.db.Exec(`DELETE FROM activity WHERE server_id = ?`, id)
 	_, _ = s.db.Exec(`DELETE FROM server_users WHERE server_id = ?`, id)
 	_, _ = s.db.Exec(`DELETE FROM alerts WHERE server_id = ?`, id)
+	_, _ = s.db.Exec(`DELETE FROM plugin_installs WHERE server_id = ?`, id)
 	_, err := s.db.Exec(`DELETE FROM servers WHERE id = ?`, id)
 	return err
 }

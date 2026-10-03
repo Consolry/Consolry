@@ -117,9 +117,12 @@ export type Plugin = {
   iconUrl?: string;
   version?: string;
   update?: string;
+  source?: PluginSource;
 };
 export type PluginList = { folder: string; items: Plugin[]; lookupFailed: boolean };
-export type Project = { projectId: string; title: string; description: string; author: string; downloads: number; iconUrl: string };
+export type PluginSource = "modrinth" | "hangar" | "curseforge";
+export type Project = { projectId: string; title: string; description: string; author: string; downloads: number; iconUrl: string; source: PluginSource };
+export type PluginSearch = { projects: Project[]; total: number; pageSize: number; sources: PluginSource[]; curseforgeReady: boolean };
 export type Finding = { title: string; detail: string; fix: string; line: string };
 export type NewServerInput = {
   name: string;
@@ -232,13 +235,20 @@ export const api = {
   backupUrl: (id: string, name: string) => `/api${node(id)}/backups/${name}`,
 
   plugins: (id: string) => request<PluginList>("GET", `/servers/${id}/plugins`),
-  searchPlugins: (id: string, query: string, page: number) =>
-    request<{ projects: Project[]; total: number; pageSize: number }>("GET", `/servers/${id}/plugins/search?q=${q(query)}&page=${page}`),
+  searchPlugins: (id: string, query: string, page: number, source: PluginSource) =>
+    request<PluginSearch>("GET", `/servers/${id}/plugins/search?q=${q(query)}&page=${page}&source=${source}`),
+  setCurseForgeKey: (key: string) => request<void>("POST", "/plugin-sources", { curseforgeKey: key }),
   activity: (id: string, limit: number) => request<Activity[]>("GET", `/servers/${id}/activity?limit=${limit}`),
   network: (id: string) => request<Network>("GET", `/servers/${id}/network`),
   setForward: (id: string, enabled: boolean) => request<Forward | void>("POST", `/servers/${id}/network/forward`, { enabled }),
   startup: (id: string) => request<Startup>("GET", `/servers/${id}/startup`),
-  installPlugin: (id: string, projectId: string) => request<{ installed: string[] }>("POST", `/servers/${id}/plugins/install`, { projectId }),
+  installPlugin: (id: string, project: Project) =>
+    request<{ installed: string[] }>("POST", `/servers/${id}/plugins/install`, {
+      projectId: project.projectId,
+      source: project.source,
+      title: project.title,
+      iconUrl: project.iconUrl,
+    }),
   updatePlugin: (id: string, file: string) => request<{ file: string }>("POST", `/servers/${id}/plugins/update`, { file }),
 };
 
